@@ -1,0 +1,1548 @@
+import 'package:flutter/material.dart';
+import 'package:country_flags/country_flags.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import 'dart:math';
+
+import 'employmentDetails_screen.dart';
+
+class LoanEligibilityScreen extends StatefulWidget {
+  const LoanEligibilityScreen({super.key});
+
+  @override
+  State<LoanEligibilityScreen> createState() => _LoanEligibilityScreenState();
+}
+
+class _LoanEligibilityScreenState extends State<LoanEligibilityScreen> {
+  String? selectedCountry;
+  String? fullName;
+  String? email;
+  DateTime? selectedDate;
+  final _formKey = GlobalKey<FormState>();
+  final TextEditingController addressController = TextEditingController();
+  final TextEditingController cityController = TextEditingController();
+  final TextEditingController stateController = TextEditingController();
+  final TextEditingController zipController = TextEditingController();
+  final TextEditingController idController = TextEditingController();
+
+  final List<Map<String, String>> countries = [
+    {'name': 'US', 'code': 'us'},
+    {'name': 'UK', 'code': 'gb'},
+    {'name': 'Germany', 'code': 'de'},
+  ];
+
+  @override
+  void initState() {
+    super.initState();
+    _fetchUserDetails();
+  }
+
+  Future<void> _fetchUserDetails() async {
+    User? user = FirebaseAuth.instance.currentUser;
+    if (user != null) {
+      DocumentSnapshot userData = await FirebaseFirestore.instance
+          .collection('users')
+          .doc(user.uid)
+          .get();
+      setState(() {
+        fullName = userData['fullname'];
+        email = userData['email'];
+      });
+    }
+  }
+
+  Future<void> _selectDate(BuildContext context) async {
+    final DateTime? picked = await showDatePicker(
+      context: context,
+      initialDate: DateTime.now(),
+      firstDate: DateTime(1900),
+      lastDate: DateTime.now(),
+    );
+    if (picked != null && picked != selectedDate) {
+      setState(() {
+        selectedDate = picked;
+      });
+    }
+  }
+
+  int _generateCreditScore() {
+    Random random = Random();
+    return random.nextInt(300) + 500;
+  }
+
+  void _submitForm() async {
+    if (_formKey.currentState!.validate()) {
+      _formKey.currentState!.save();
+      int creditScore = _generateCreditScore();
+      User? user = FirebaseAuth.instance.currentUser;
+
+      await FirebaseFirestore.instance
+          .collection('loanApplications')
+          .doc(user!.uid)
+          .set({
+        'fullName': fullName,
+        'email': email,
+        'country': selectedCountry,
+        'dateOfBirth': selectedDate.toString(),
+        'creditScore': creditScore,
+        'address': addressController.text,
+        'city': cityController.text,
+        'state': stateController.text,
+        'zip': zipController.text,
+        'identifier': idController.text,
+      });
+
+      Navigator.push(
+        context,
+        MaterialPageRoute(builder: (context) => EmploymentDetailsScreen()),
+      );
+    }
+  }
+  Widget _buildDynamicForm() {
+    return Expanded(
+      child: SingleChildScrollView(
+        child: Form(
+          key: _formKey,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              TextField(
+                controller: TextEditingController(text: fullName),
+                decoration: InputDecoration(
+                  labelText: 'Full Name',
+                  labelStyle: TextStyle(color: Colors.black54),
+                  prefixIcon: Icon(Icons.person, color: Colors.lightBlue),
+                  enabledBorder: OutlineInputBorder(
+                    borderSide: BorderSide(color: Colors.black26),
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  focusedBorder: OutlineInputBorder(
+                    borderSide: BorderSide(color: Colors.grey),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                ),
+                readOnly: true,
+              ),
+              SizedBox(height: 12),
+              TextField(
+                controller: TextEditingController(text: email),
+                decoration: InputDecoration(
+                  labelText: 'Email Address',
+                  labelStyle: TextStyle(color: Colors.black54),
+                  prefixIcon: Icon(Icons.email, color: Colors.lightBlue),
+                  enabledBorder: OutlineInputBorder(
+                    borderSide: BorderSide(color: Colors.black26),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  focusedBorder: OutlineInputBorder(
+                    borderSide: BorderSide(color: Colors.grey),
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                ),
+                //decoration: InputDecoration(labelText: 'Email Address'),
+                readOnly: true,
+              ),
+              if (selectedCountry == 'US') ...[
+                SizedBox(height: 16),
+                Text('Date of Birth:'),
+                TextFormField(
+                  readOnly: true,
+                  decoration: InputDecoration(
+                    hintText: selectedDate == null
+                        ? 'Enter date of birth'
+                        : '${selectedDate!.toLocal()}'.split(' ')[0],
+                    hintStyle: TextStyle(color: Colors.black45),
+                    suffixIcon: IconButton(
+                      icon: Icon(Icons.calendar_today, color: Colors.lightBlue,),
+                      onPressed: () => _selectDate(context),
+                    ),
+                    enabledBorder: OutlineInputBorder(
+                    borderSide: BorderSide(color: Colors.black26),
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                    focusedBorder: OutlineInputBorder(
+                      borderSide: BorderSide(color: Colors.grey),
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                  ),
+                  validator: (value) {
+                    if (selectedDate == null) {
+                      return 'Please select your date of birth';
+                    }
+                    return null;
+                  },
+                ),
+                SizedBox(height: 10),
+                Text('Social Security Number (SSN):'),
+                TextFormField(
+                  controller: idController,
+                  keyboardType: TextInputType.number,
+                  decoration: InputDecoration(
+                    hintText: 'Enter SSN',
+                    labelStyle: TextStyle(color: Colors.black54),
+                    prefixIcon: Icon(Icons.security, color: Colors.lightBlue),
+                    enabledBorder: OutlineInputBorder(
+                      borderSide: BorderSide(color: Colors.black26),
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    focusedBorder: OutlineInputBorder(
+                      borderSide: BorderSide(color: Colors.grey),
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                  ),
+
+                  validator: (value) {
+                    if (value!.isEmpty) {
+                      return 'Please enter your SSN';
+                    } else if (value.length < 9 && value.length > 9){
+                      return 'SSN must be 9 characters';
+                    }
+                    return null;
+                  },
+                ),
+                SizedBox(height: 10),
+                Text('Residential Address:'),
+                TextFormField(
+                  controller: addressController,
+                  keyboardType: TextInputType.streetAddress,
+                  //decoration: InputDecoration(hintText: 'Enter Address'),
+                  decoration: InputDecoration(
+                    hintText: 'Street Name [House/ Block/ Building Number]',
+                    labelStyle: TextStyle(color: Colors.black54, fontSize: 8),
+                    prefixIcon: Icon(Icons.house, color: Colors.lightBlue),
+                    enabledBorder: OutlineInputBorder(
+                      borderSide: BorderSide(color: Colors.black26),
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    focusedBorder: OutlineInputBorder(
+                      borderSide: BorderSide(color: Colors.grey),
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                  ),
+                ),
+                SizedBox(height: 10),
+                TextFormField(
+                  controller: cityController,
+                  keyboardType: TextInputType.streetAddress,
+                  decoration: InputDecoration(
+                    hintText: 'City',
+                    labelStyle: TextStyle(color: Colors.black54),
+                    prefixIcon: Icon(Icons.location_city, color: Colors.lightBlue),
+                    enabledBorder: OutlineInputBorder(
+                      borderSide: BorderSide(color: Colors.black26),
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    focusedBorder: OutlineInputBorder(
+                      borderSide: BorderSide(color: Colors.grey),
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                  ),
+                ),
+                SizedBox(height: 10),
+                TextFormField(
+                  controller: stateController,
+                  keyboardType: TextInputType.streetAddress,
+                  decoration: InputDecoration(
+                    hintText: 'State',
+                    labelStyle: TextStyle(color: Colors.black54),
+                    prefixIcon: Icon(Icons.location_city_rounded, color: Colors.lightBlue),
+                    enabledBorder: OutlineInputBorder(
+                      borderSide: BorderSide(color: Colors.black26),
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    focusedBorder: OutlineInputBorder(
+                      borderSide: BorderSide(color: Colors.grey),
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                  ),
+                ),
+                SizedBox(height: 10),
+                TextFormField(
+                  controller: zipController,
+                  //decoration: InputDecoration(hintText: 'Zip Code'),
+                  decoration: InputDecoration(
+                    hintText: 'Zip Code',
+                    labelStyle: TextStyle(color: Colors.black54),
+                    prefixIcon: Icon(Icons.post_add, color: Colors.lightBlue),
+                    enabledBorder: OutlineInputBorder(
+                      borderSide: BorderSide(color: Colors.black26),
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    focusedBorder: OutlineInputBorder(
+                      borderSide: BorderSide(color: Colors.grey),
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                  ),
+                ),
+              ] else if (selectedCountry == 'UK') ...[
+                SizedBox(height: 20),
+                Text('Date of Birth:'),
+                TextFormField(
+                  readOnly: true,
+                  decoration: InputDecoration(
+                    hintText: selectedDate == null
+                        ? 'Enter date of birth'
+                        : '${selectedDate!.toLocal()}'.split(' ')[0],
+                    suffixIcon: IconButton(
+                      icon: Icon(Icons.calendar_today),
+                      onPressed: () => _selectDate(context),
+                    ),
+                  ),
+                  validator: (value) {
+                    if (selectedDate == null) {
+                      return 'Please select your date of birth';
+                    }
+                    return null;
+                  },
+                ),
+                Text('National Insurance Number (NIN):'),
+                TextFormField(
+                  controller: idController,
+                  decoration: InputDecoration(hintText: 'Enter NIN'),
+                  validator: (value) {
+                    if (value!.isEmpty) {
+                      return 'Please enter the your NIN';
+                    } else if (value.length < 9 && value.length > 9){
+                      return 'NIN must be 9 characters';
+                    }
+                    return null;
+                  },
+                ),
+                SizedBox(height: 10),
+                Text('Address:'),
+                TextFormField(
+                  controller: addressController,
+                  decoration: InputDecoration(hintText: 'Enter Address'),
+                ),
+                TextFormField(
+                  controller: cityController,
+                  decoration: InputDecoration(hintText: 'City'),
+                ),
+                TextFormField(
+                  controller: stateController,
+                  decoration: InputDecoration(hintText: 'State'),
+                ),
+                TextFormField(
+                  controller: zipController,
+                  decoration: InputDecoration(hintText: 'Zip Code'),
+                ),
+              ] else if (selectedCountry == 'Germany') ...[
+                SizedBox(height: 20),
+                Text('Date of Birth:'),
+                TextFormField(
+                  readOnly: true,
+                  decoration: InputDecoration(
+                    hintText: selectedDate == null
+                        ? 'Enter date of birth'
+                        : '${selectedDate!.toLocal()}'.split(' ')[0],
+                    suffixIcon: IconButton(
+                      icon: Icon(Icons.calendar_today),
+                      onPressed: () => _selectDate(context),
+                    ),
+                  ),
+                  validator: (value) {
+                    if (selectedDate == null) {
+                      return 'Please select your date of birth';
+                    }
+                    return null;
+                  },
+                ),
+                Text('SCHUFA Number:'),
+                TextFormField(
+                  controller: idController,
+                  decoration: InputDecoration(hintText: 'Enter SCHUFA Number'),
+                  validator: (value) {
+                    if (value!.isEmpty) {
+                      return 'Please enter your SCHUFA Number';
+                    } else if (value.length < 10 && value.length > 10){
+                      return 'SCHUFA Number must be 10 characters';
+                    }
+                    return null;
+                  },
+                ),
+                SizedBox(height: 10),
+                Text('Address:'),
+                TextFormField(
+                  controller: addressController,
+                  decoration: InputDecoration(hintText: 'Enter Address'),
+                ),
+                TextFormField(
+                  controller: cityController,
+                  decoration: InputDecoration(hintText: 'City'),
+                ),
+                TextFormField(
+                  controller: stateController,
+                  decoration: InputDecoration(hintText: 'State'),
+                ),
+                TextFormField(
+                  controller: zipController,
+                  decoration: InputDecoration(hintText: 'Zip Code'),
+                ),
+              ],
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(
+        title: Text('Loan Eligibility'),
+        backgroundColor: Colors.teal, // Changed background color
+      ),
+      body: Padding(
+        padding: const EdgeInsets.all(14.0),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'Select your country:',
+              style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+            ),
+            SizedBox(height: 20),
+            DropdownButtonFormField<String>(
+              value: selectedCountry,
+              hint: Text('Select your country'),
+              decoration: InputDecoration(
+                border: OutlineInputBorder(),
+              ),
+              items: countries.map((country) {
+                return DropdownMenuItem(
+                  value: country['name'],
+                  child: Row(
+                    children: [
+                      CountryFlag.fromCountryCode(
+                        country['code']!,
+                        height: 24,
+                        width: 32,
+                        shape: const RoundedRectangle(8),
+                      ),
+                      SizedBox(width: 10),
+                      Text(country['name']!),
+                    ],
+                  ),
+                );
+              }).toList(),
+              onChanged: (value) {
+                setState(() {
+                  selectedCountry = value;
+                });
+              },
+            ),
+            SizedBox(height: 30),
+            _buildDynamicForm(),
+            SizedBox(height: 30),
+            Center(
+              child: ElevatedButton(
+                onPressed: _submitForm,
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Colors.teal, // Changed button color
+                  padding: EdgeInsets.symmetric(horizontal: 40, vertical: 14),
+                ),
+                child: Text(
+                  'Check Eligibility',
+                  style: TextStyle(fontSize: 16, color: Colors.white),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+=====================================================================================================
+import 'package:country_flags/country_flags.dart';
+import 'package:flutter/material.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import 'dart:math';
+import 'employmentDetails_screen.dart';
+
+class LoanEligibilityScreen extends StatefulWidget {
+  const LoanEligibilityScreen({super.key});
+
+  @override
+  State<LoanEligibilityScreen> createState() => _LoanEligibilityScreenState();
+}
+
+class _LoanEligibilityScreenState extends State<LoanEligibilityScreen> {
+  String? selectedCountry;
+  String? fullName;
+  String? email;
+  DateTime? selectedDate;
+  final _formKey = GlobalKey<FormState>();
+  final TextEditingController addressController = TextEditingController();
+  final TextEditingController cityController = TextEditingController();
+  final TextEditingController stateController = TextEditingController();
+  final TextEditingController zipController = TextEditingController();
+  final TextEditingController idController = TextEditingController();
+
+  final List<Map<String, String>> countries = [
+    {'name': 'US', 'code': 'us'},
+    {'name': 'UK', 'code': 'gb'},
+    {'name': 'Germany', 'code': 'de'},
+  ];
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _fetchUserDetails();
+    });
+  }
+
+  Future<void> _fetchUserDetails() async {
+    User? user = FirebaseAuth.instance.currentUser;
+    if (user != null) {
+      DocumentSnapshot userData = await FirebaseFirestore.instance
+          .collection('users')
+          .doc(user.uid)
+          .get();
+      if (mounted) {
+        setState(() {
+          fullName = userData['fullname'];
+          email = userData['email'];
+        });
+      }
+    }
+  }
+
+  Future<void> _selectDate(BuildContext context) async {
+    final DateTime? picked = await showDatePicker(
+      context: context,
+      initialDate: DateTime.now(),
+      firstDate: DateTime(1900),
+      lastDate: DateTime.now(),
+    );
+    if (picked != null && picked != selectedDate) {
+      setState(() {
+        selectedDate = picked;
+      });
+    }
+  }
+
+  int _generateCreditScore() {
+    Random random = Random();
+    return random.nextInt(300) + 500;
+  }
+
+  void _showSnackbar(String message) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(message),
+        backgroundColor: Colors.teal,
+        duration: Duration(seconds: 3),
+      ),
+    );
+  }
+
+  void _showConfirmationDialog() {
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          title: Text('Confirm Submission'),
+          content: Text('Are you sure you want to submit this form?'),
+          actions: [
+            TextButton(
+              onPressed: () {
+                Navigator.of(context).pop();
+              },
+              child: Text('Cancel'),
+            ),
+            ElevatedButton(
+              onPressed: () {
+                Navigator.of(context).pop();
+                _submitForm();
+              },
+              child: Text('Submit'),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  void _submitForm() async {
+    if (_formKey.currentState!.validate()) {
+      _formKey.currentState!.save();
+      int creditScore = _generateCreditScore();
+      User? user = FirebaseAuth.instance.currentUser;
+
+      await FirebaseFirestore.instance
+          .collection('loanApplications')
+          .doc(user!.uid)
+          .set({
+        'fullName': fullName,
+        'email': email,
+        'country': selectedCountry,
+        'dateOfBirth': selectedDate.toString(),
+        'creditScore': creditScore,
+        'address': addressController.text,
+        'city': cityController.text,
+        'state': stateController.text,
+        'zip': zipController.text,
+        'identifier': idController.text,
+      });
+
+      _showSnackbar('Form submitted successfully!');
+
+      if (mounted) {
+        Navigator.push(
+          context,
+          MaterialPageRoute(builder: (context) => EmploymentDetailsScreen()),
+        );
+      }
+    }
+  }
+
+  Widget _buildUSFormFields() {
+    return Column(
+      children: [
+        TextFormField(
+          controller: addressController,
+          decoration: InputDecoration(
+            labelText: 'Address',
+            prefixIcon: Icon(Icons.home, color: Colors.lightBlue),
+          ),
+          validator: (value) => value!.isEmpty ? 'Enter address' : null,
+        ),
+        TextFormField(
+          controller: stateController,
+          decoration: InputDecoration(
+            labelText: 'State',
+            prefixIcon: Icon(Icons.map, color: Colors.lightBlue),
+          ),
+          validator: (value) => value!.isEmpty ? 'Enter state' : null,
+        ),
+        TextFormField(
+          controller: zipController,
+          decoration: InputDecoration(
+            labelText: 'ZIP Code',
+            prefixIcon: Icon(Icons.pin, color: Colors.lightBlue),
+          ),
+          validator: (value) => value!.isEmpty ? 'Enter ZIP code' : null,
+        ),
+      ],
+    );
+  }
+
+  Widget _buildDynamicForm() {
+    return Expanded(
+      child: SingleChildScrollView(
+        child: Form(
+          key: _formKey,
+          child: Column(
+            children: [
+              Text(
+                'Select your country:',
+                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+              ),
+              SizedBox(height: 20),
+              DropdownButtonFormField<String>(
+                value: selectedCountry,
+                hint: Text('Select your country'),
+                decoration: InputDecoration(
+                  border: OutlineInputBorder(),
+                ),
+                items: countries.map((country) {
+                  return DropdownMenuItem(
+                    value: country['name'],
+                    child: Row(
+                      children: [
+                        CountryFlag.fromCountryCode(
+                          country['code']!,
+                          height: 24,
+                          width: 32,
+                          shape: const RoundedRectangle(8),
+                        ),
+                        SizedBox(width: 10),
+                        Text(country['name']!),
+                      ],
+                    ),
+                  );
+                }).toList(),
+                onChanged: (value) {
+                  setState(() {
+                    selectedCountry = value;
+                  });
+                },
+              ),
+              SizedBox(height: 30),
+
+              if (selectedCountry == 'US') _buildUSFormFields(),
+              ElevatedButton(
+                onPressed: _showConfirmationDialog,
+                child: Text('Submit'),
+              ),
+
+              if (selectedCountry == 'UK') _buildUKFormFormFields()
+              //_buildDynamicForm(),
+              SizedBox(height: 30),
+              Center(
+                child: ElevatedButton(
+                  onPressed: _submitForm,
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Colors.teal, // Changed button color
+                    padding: EdgeInsets.symmetric(horizontal: 40, vertical: 14),
+                  ),
+                  child: Text(
+                    'Check Eligibility',
+                    style: TextStyle(fontSize: 16, color: Colors.white),
+                  ),
+                ),
+              ),
+
+              /*DropdownButtonFormField<String>(
+                decoration: InputDecoration(
+                  labelText: 'Select Country',
+                ),
+                value: selectedCountry,
+                items: countries.map((country) {
+                  return DropdownMenuItem<String>(
+                    value: country['name'],
+                    child: Text(country['name']!),
+                  );
+                }).toList(),
+                onChanged: (value) {
+                  setState(() {
+                    selectedCountry = value;
+                  });
+                },
+                validator: (value) => value == null ? 'Select a country' : null,
+              ),
+              if (selectedCountry == 'US') _buildUSFormFields(),
+              ElevatedButton(
+                onPressed: _showConfirmationDialog,
+                child: Text('Submit'),
+              ),*/
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(
+        title: Text('Loan Eligibility Form'),
+      ),
+      body: Center(
+        child: Column(
+          children: [
+            _buildDynamicForm(),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+====================================================================================================
+
+import 'package:flutter/material.dart';
+import 'package:country_flags/country_flags.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import 'dart:math';
+
+import 'employmentDetails_screen.dart';
+
+class LoanEligibilityScreen extends StatefulWidget {
+  const LoanEligibilityScreen({super.key});
+
+  @override
+  State<LoanEligibilityScreen> createState() => _LoanEligibilityScreenState();
+}
+
+class _LoanEligibilityScreenState extends State<LoanEligibilityScreen> {
+  String? selectedCountry;
+  String? fullName;
+  String? email;
+  DateTime? selectedDate;
+  final _formKey = GlobalKey<FormState>();
+  final TextEditingController addressController = TextEditingController();
+  final TextEditingController cityController = TextEditingController();
+  final TextEditingController stateController = TextEditingController();
+  final TextEditingController zipController = TextEditingController();
+  final TextEditingController idController = TextEditingController();
+
+  final List<Map<String, String>> countries = [
+    {'name': 'US', 'code': 'us'},
+    {'name': 'UK', 'code': 'gb'},
+    {'name': 'Germany', 'code': 'de'},
+  ];
+
+  @override
+  void initState() {
+    super.initState();
+    _fetchUserDetails();
+  }
+
+  Future<void> _fetchUserDetails() async {
+    User? user = FirebaseAuth.instance.currentUser;
+    if (user != null) {
+      DocumentSnapshot userData = await FirebaseFirestore.instance
+          .collection('users')
+          .doc(user.uid)
+          .get();
+      setState(() {
+        fullName = userData['fullname'];
+        email = userData['email'];
+      });
+    }
+  }
+
+  Future<void> _selectDate(BuildContext context) async {
+    final DateTime? picked = await showDatePicker(
+      context: context,
+      initialDate: DateTime.now(),
+      firstDate: DateTime(1900),
+      lastDate: DateTime.now(),
+    );
+    if (picked != null && picked != selectedDate) {
+      setState(() {
+        selectedDate = picked;
+      });
+    }
+  }
+
+  int _generateCreditScore() {
+    Random random = Random();
+    return random.nextInt(300) + 500;
+  }
+
+  void _submitForm() async {
+    if (_formKey.currentState!.validate()) {
+      _formKey.currentState!.save();
+      int creditScore = _generateCreditScore();
+      User? user = FirebaseAuth.instance.currentUser;
+
+      await FirebaseFirestore.instance
+          .collection('loanApplications')
+          .doc(user!.uid)
+          .set({
+        'fullName': fullName,
+        'email': email,
+        'country': selectedCountry,
+        'dateOfBirth': selectedDate.toString(),
+        'creditScore': creditScore,
+        'address': addressController.text,
+        'city': cityController.text,
+        'state': stateController.text,
+        'zip': zipController.text,
+        'identifier': idController.text,
+      });
+
+      Navigator.push(
+        context,
+        MaterialPageRoute(builder: (context) => EmploymentDetailsScreen()),
+      );
+    }
+  }
+  Widget _buildDynamicForm() {
+    return Expanded(
+      child: SingleChildScrollView(
+        child: Form(
+          key: _formKey,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              TextField(
+                controller: TextEditingController(text: fullName),
+                decoration: InputDecoration(
+                  labelText: 'Full Name',
+                  labelStyle: TextStyle(color: Colors.black54),
+                  prefixIcon: Icon(Icons.person, color: Colors.lightBlue),
+                  enabledBorder: OutlineInputBorder(
+                    borderSide: BorderSide(color: Colors.black26),
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  focusedBorder: OutlineInputBorder(
+                    borderSide: BorderSide(color: Colors.grey),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                ),
+                readOnly: true,
+              ),
+              SizedBox(height: 12),
+              TextField(
+                controller: TextEditingController(text: email),
+                decoration: InputDecoration(
+                  labelText: 'Email Address',
+                  labelStyle: TextStyle(color: Colors.black54),
+                  prefixIcon: Icon(Icons.email, color: Colors.lightBlue),
+                  enabledBorder: OutlineInputBorder(
+                    borderSide: BorderSide(color: Colors.black26),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  focusedBorder: OutlineInputBorder(
+                    borderSide: BorderSide(color: Colors.grey),
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                ),
+                //decoration: InputDecoration(labelText: 'Email Address'),
+                readOnly: true,
+              ),
+              if (selectedCountry == 'US') ...[
+                SizedBox(height: 16),
+                Text('Date of Birth:'),
+                TextFormField(
+                  readOnly: true,
+                  decoration: InputDecoration(
+                    hintText: selectedDate == null
+                        ? 'Enter date of birth'
+                        : '${selectedDate!.toLocal()}'.split(' ')[0],
+                    hintStyle: TextStyle(color: Colors.black45),
+                    suffixIcon: IconButton(
+                      icon: Icon(Icons.calendar_today, color: Colors.lightBlue,),
+                      onPressed: () => _selectDate(context),
+                    ),
+                    enabledBorder: OutlineInputBorder(
+                    borderSide: BorderSide(color: Colors.black26),
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                    focusedBorder: OutlineInputBorder(
+                      borderSide: BorderSide(color: Colors.grey),
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                  ),
+                  validator: (value) {
+                    if (selectedDate == null) {
+                      return 'Please select your date of birth';
+                    }
+                    return null;
+                  },
+                ),
+                SizedBox(height: 10),
+                Text('Social Security Number (SSN):'),
+                TextFormField(
+                  controller: idController,
+                  keyboardType: TextInputType.number,
+                  decoration: InputDecoration(
+                    hintText: 'Enter SSN',
+                    labelStyle: TextStyle(color: Colors.black54),
+                    prefixIcon: Icon(Icons.security, color: Colors.lightBlue),
+                    enabledBorder: OutlineInputBorder(
+                      borderSide: BorderSide(color: Colors.black26),
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    focusedBorder: OutlineInputBorder(
+                      borderSide: BorderSide(color: Colors.grey),
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                  ),
+
+                  validator: (value) {
+                    if (value!.isEmpty) {
+                      return 'Please enter your SSN';
+                    } else if (value.length < 9 && value.length > 9){
+                      return 'SSN must be 9 characters';
+                    }
+                    return null;
+                  },
+                ),
+                SizedBox(height: 10),
+                Text('Residential Address:'),
+                TextFormField(
+                  controller: addressController,
+                  keyboardType: TextInputType.streetAddress,
+                  //decoration: InputDecoration(hintText: 'Enter Address'),
+                  decoration: InputDecoration(
+                    hintText: 'Street Name [House/ Block/ Building Number]',
+                    labelStyle: TextStyle(color: Colors.black54, fontSize: 8),
+                    prefixIcon: Icon(Icons.house, color: Colors.lightBlue),
+                    enabledBorder: OutlineInputBorder(
+                      borderSide: BorderSide(color: Colors.black26),
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    focusedBorder: OutlineInputBorder(
+                      borderSide: BorderSide(color: Colors.grey),
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                  ),
+                ),
+                SizedBox(height: 10),
+                TextFormField(
+                  controller: cityController,
+                  keyboardType: TextInputType.streetAddress,
+                  decoration: InputDecoration(
+                    hintText: 'City',
+                    labelStyle: TextStyle(color: Colors.black54),
+                    prefixIcon: Icon(Icons.location_city, color: Colors.lightBlue),
+                    enabledBorder: OutlineInputBorder(
+                      borderSide: BorderSide(color: Colors.black26),
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    focusedBorder: OutlineInputBorder(
+                      borderSide: BorderSide(color: Colors.grey),
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                  ),
+                ),
+                SizedBox(height: 10),
+                TextFormField(
+                  controller: stateController,
+                  keyboardType: TextInputType.streetAddress,
+                  decoration: InputDecoration(
+                    hintText: 'State',
+                    labelStyle: TextStyle(color: Colors.black54),
+                    prefixIcon: Icon(Icons.location_city_rounded, color: Colors.lightBlue),
+                    enabledBorder: OutlineInputBorder(
+                      borderSide: BorderSide(color: Colors.black26),
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    focusedBorder: OutlineInputBorder(
+                      borderSide: BorderSide(color: Colors.grey),
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                  ),
+                ),
+                SizedBox(height: 10),
+                TextFormField(
+                  controller: zipController,
+                  //decoration: InputDecoration(hintText: 'Zip Code'),
+                  decoration: InputDecoration(
+                    hintText: 'Zip Code',
+                    labelStyle: TextStyle(color: Colors.black54),
+                    prefixIcon: Icon(Icons.post_add, color: Colors.lightBlue),
+                    enabledBorder: OutlineInputBorder(
+                      borderSide: BorderSide(color: Colors.black26),
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    focusedBorder: OutlineInputBorder(
+                      borderSide: BorderSide(color: Colors.grey),
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                  ),
+                ),
+              ] else if (selectedCountry == 'UK') ...[
+                SizedBox(height: 20),
+                Text('Date of Birth:'),
+                TextFormField(
+                  readOnly: true,
+                  decoration: InputDecoration(
+                    hintText: selectedDate == null
+                        ? 'Enter date of birth'
+                        : '${selectedDate!.toLocal()}'.split(' ')[0],
+                    suffixIcon: IconButton(
+                      icon: Icon(Icons.calendar_today),
+                      onPressed: () => _selectDate(context),
+                    ),
+                  ),
+                  validator: (value) {
+                    if (selectedDate == null) {
+                      return 'Please select your date of birth';
+                    }
+                    return null;
+                  },
+                ),
+                Text('National Insurance Number (NIN):'),
+                TextFormField(
+                  controller: idController,
+                  decoration: InputDecoration(hintText: 'Enter NIN'),
+                  validator: (value) {
+                    if (value!.isEmpty) {
+                      return 'Please enter the your NIN';
+                    } else if (value.length < 9 && value.length > 9){
+                      return 'NIN must be 9 characters';
+                    }
+                    return null;
+                  },
+                ),
+                SizedBox(height: 10),
+                Text('Address:'),
+                TextFormField(
+                  controller: addressController,
+                  decoration: InputDecoration(hintText: 'Enter Address'),
+                ),
+                TextFormField(
+                  controller: cityController,
+                  decoration: InputDecoration(hintText: 'City'),
+                ),
+                TextFormField(
+                  controller: stateController,
+                  decoration: InputDecoration(hintText: 'State'),
+                ),
+                TextFormField(
+                  controller: zipController,
+                  decoration: InputDecoration(hintText: 'Zip Code'),
+                ),
+              ] else if (selectedCountry == 'Germany') ...[
+                SizedBox(height: 20),
+                Text('Date of Birth:'),
+                TextFormField(
+                  readOnly: true,
+                  decoration: InputDecoration(
+                    hintText: selectedDate == null
+                        ? 'Enter date of birth'
+                        : '${selectedDate!.toLocal()}'.split(' ')[0],
+                    suffixIcon: IconButton(
+                      icon: Icon(Icons.calendar_today),
+                      onPressed: () => _selectDate(context),
+                    ),
+                  ),
+                  validator: (value) {
+                    if (selectedDate == null) {
+                      return 'Please select your date of birth';
+                    }
+                    return null;
+                  },
+                ),
+                Text('SCHUFA Number:'),
+                TextFormField(
+                  controller: idController,
+                  decoration: InputDecoration(hintText: 'Enter SCHUFA Number'),
+                  validator: (value) {
+                    if (value!.isEmpty) {
+                      return 'Please enter your SCHUFA Number';
+                    } else if (value.length < 10 && value.length > 10){
+                      return 'SCHUFA Number must be 10 characters';
+                    }
+                    return null;
+                  },
+                ),
+                SizedBox(height: 10),
+                Text('Address:'),
+                TextFormField(
+                  controller: addressController,
+                  decoration: InputDecoration(hintText: 'Enter Address'),
+                ),
+                TextFormField(
+                  controller: cityController,
+                  decoration: InputDecoration(hintText: 'City'),
+                ),
+                TextFormField(
+                  controller: stateController,
+                  decoration: InputDecoration(hintText: 'State'),
+                ),
+                TextFormField(
+                  controller: zipController,
+                  decoration: InputDecoration(hintText: 'Zip Code'),
+                ),
+              ],
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(
+        title: Text('Loan Eligibility'),
+        backgroundColor: Colors.teal, // Changed background color
+      ),
+      body: Padding(
+        padding: const EdgeInsets.all(14.0),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'Select your country:',
+              style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+            ),
+            SizedBox(height: 20),
+            DropdownButtonFormField<String>(
+              value: selectedCountry,
+              hint: Text('Select your country'),
+              decoration: InputDecoration(
+                border: OutlineInputBorder(),
+              ),
+              items: countries.map((country) {
+                return DropdownMenuItem(
+                  value: country['name'],
+                  child: Row(
+                    children: [
+                      CountryFlag.fromCountryCode(
+                        country['code']!,
+                        height: 24,
+                        width: 32,
+                        shape: const RoundedRectangle(8),
+                      ),
+                      SizedBox(width: 10),
+                      Text(country['name']!),
+                    ],
+                  ),
+                );
+              }).toList(),
+              onChanged: (value) {
+                setState(() {
+                  selectedCountry = value;
+                });
+              },
+            ),
+            SizedBox(height: 30),
+            _buildDynamicForm(),
+            SizedBox(height: 30),
+            Center(
+              child: ElevatedButton(
+                onPressed: _submitForm,
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Colors.teal, // Changed button color
+                  padding: EdgeInsets.symmetric(horizontal: 40, vertical: 14),
+                ),
+                child: Text(
+                  'Check Eligibility',
+                  style: TextStyle(fontSize: 16, color: Colors.white),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+
+====================================================================================================
+
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:flutter/material.dart';
+import 'package:loan_app/screens/profile_screen.dart';
+
+import 'loaneligibility_screen.dart';
+
+class DashboardScreen extends StatelessWidget {
+  const DashboardScreen({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+
+      appBar: AppBar(
+        backgroundColor: Colors.teal,
+        title: Text('Dashboard'),
+        actions: [
+          IconButton(
+            icon: Icon(Icons.notifications, color: Colors.white,),
+            onPressed: () {
+              // Handle notifications
+            },
+          ),
+          IconButton(
+            icon: Icon(Icons.account_circle, color: Colors.white,),
+            onPressed: () {
+              // Handle profile
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (context) => ProfileScreen()),
+              );
+            },
+          ),
+          SizedBox(width: 10,),
+        ],
+      ),
+
+      drawer: Drawer(
+        child: ListView(
+          padding: EdgeInsets.zero,
+          children: [
+            DrawerHeader(
+              decoration: BoxDecoration(
+                color: Colors.grey,
+              ),
+              child: Text(
+                'Grey Loan',
+                style: TextStyle(
+                  color: Colors.white,
+                  fontSize: 24,
+                ),
+              ),
+            ),
+            ListTile(
+              leading: Icon(Icons.person),
+              title: Text('Profile'),
+              onTap: () {
+                // Navigate to profile
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (context) => ProfileScreen()),
+                );
+              },
+            ),
+            ListTile(
+              leading: Icon(Icons.notifications),
+              title: Text('Notifications'),
+              onTap: () {
+                // Navigate to notifications
+              },
+            ),
+            ListTile(
+              leading: Icon(Icons.settings),
+              title: Text('Settings'),
+              onTap: () {
+                // Navigate to settings
+              },
+            ),
+            ListTile(
+              leading: Icon(Icons.logout),
+              title: Text('Logout'),
+              onTap: () async {
+                // Handle logout
+                await FirebaseAuth.instance.signOut();
+              },
+            ),
+          ],
+        ),
+      ),
+      body: Container(
+          padding: EdgeInsets.all(20),
+          decoration: BoxDecoration(
+            image: DecorationImage(
+              image: AssetImage('assets/background.png'),
+              fit: BoxFit.cover,
+            ),
+          ),
+      /*Padding(
+        padding: const EdgeInsets.all(16.0),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            SizedBox(height: 30,),
+            Text(
+              'Loan Summary',
+              style: TextStyle(
+                fontSize: 24,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+            SizedBox(height: 10),
+            Card(
+              elevation: 4,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(10),
+              ),
+              child: ListTile(
+                leading: Icon(Icons.monetization_on, color: Colors.blueAccent),
+                title: Text('Current Loan Balance'),
+                subtitle: Text('No Records'),
+              ),
+            ),
+            SizedBox(height: 10),
+            Card(
+              elevation: 4,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(10),
+              ),
+              child: ListTile(
+                leading: Icon(Icons.calendar_today, color: Colors.green),
+                title: Text('Next Payment Due'),
+                subtitle: Text('No Records'),
+              ),
+            ),
+            SizedBox(height: 20),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                ElevatedButton.icon(
+                  onPressed: () {
+                    // Navigate to apply for new loan
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(builder: (context) => LoanEligibilityScreen()),
+                    );
+                  },
+                  icon: Icon(Icons.add),
+                  label: Text('Apply for Loan'),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Colors.white,
+                    padding: EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                  ),
+                ),
+                ElevatedButton.icon(
+                  onPressed: () {
+                    // Navigate to make repayment
+                  },
+                  icon: Icon(Icons.payment),
+                  label: Text('Repay Loan'),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Colors.green,
+                    padding: EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                  ),
+                ),
+              ],
+            ),
+            SizedBox(height: 30),
+            Text(
+              'Quick Actions',
+              style: TextStyle(
+                fontSize: 20,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+            SizedBox(height: 10),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceAround,
+              children: [
+                Column(
+                  children: [
+                    CircleAvatar(
+                      backgroundColor: Colors.orangeAccent,
+                      radius: 30,
+                      child: Icon(Icons.history, color: Colors.white, size: 30),
+                    ),
+                    SizedBox(height: 8),
+                    Text('History'),
+                  ],
+                ),
+                Column(
+                  children: [
+                    CircleAvatar(
+                      backgroundColor: Colors.purpleAccent,
+                      radius: 30,
+                      child: Icon(Icons.receipt, color: Colors.white, size: 30),
+                    ),
+                    SizedBox(height: 8),
+                    Text('Receipts'),
+                  ],
+                ),
+                Column(
+                  children: [
+                    CircleAvatar(
+                      backgroundColor: Colors.redAccent,
+                      radius: 30,
+                      child: Icon(Icons.help, color: Colors.white, size: 30),
+                    ),
+                    SizedBox(height: 8),
+                    Text('Support'),
+                  ],
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),*/
+        child: Center(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              SizedBox(height: 10,),
+              Text(
+                'Loan Summary',
+                style: TextStyle(
+                  fontSize: 30,
+                  fontWeight: FontWeight.bold,
+                  color: Colors.white,
+                ),
+              ),
+              SizedBox(height: 10),
+              Card(
+                elevation: 4,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: ListTile(
+                  leading: Icon(Icons.monetization_on, color: Colors.blueAccent),
+                  title: Text('Current Loan Balance'),
+                  subtitle: Text('No Records'),
+                ),
+              ),
+              SizedBox(height: 10),
+              Card(
+                elevation: 4,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: ListTile(
+                  leading: Icon(Icons.calendar_today, color: Colors.green),
+                  title: Text('Next Payment Due'),
+                  subtitle: Text('No Records'),
+                ),
+              ),
+              SizedBox(height: 20),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  ElevatedButton.icon(
+                    onPressed: () {
+                      // Navigate to apply for new loan
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(builder: (context) => LoanEligibilityScreen()),
+                      );
+                    },
+                    icon: Icon(Icons.add),
+                    label: Text('Apply for Loan'),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Colors.white,
+                      padding: EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                    ),
+                  ),
+                  ElevatedButton.icon(
+                    onPressed: () {
+                      // Navigate to make repayment
+                    },
+                    icon: Icon(Icons.payment),
+                    label: Text('Repay Loan'),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Colors.white,
+                      padding: EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                    ),
+                  ),
+                ],
+              ),
+              SizedBox(height: 30),
+              Text(
+                'Quick Actions',
+                style: TextStyle(
+                  fontSize: 20,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+              SizedBox(height: 10),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceAround,
+                children: [
+                  Column(
+                    children: [
+                      CircleAvatar(
+                        backgroundColor: Colors.orangeAccent,
+                        radius: 30,
+                        child: Icon(Icons.history, color: Colors.white, size: 30),
+                      ),
+                      SizedBox(height: 8),
+                      Text('History'),
+                    ],
+                  ),
+                  Column(
+                    children: [
+                      CircleAvatar(
+                        backgroundColor: Colors.purpleAccent,
+                        radius: 30,
+                        child: Icon(Icons.receipt, color: Colors.white, size: 30),
+                      ),
+                      SizedBox(height: 8),
+                      Text('Receipts'),
+                    ],
+                  ),
+                  Column(
+                    children: [
+                      CircleAvatar(
+                        backgroundColor: Colors.redAccent,
+                        radius: 30,
+                        child: Icon(Icons.help, color: Colors.white, size: 30),
+                      ),
+                      SizedBox(height: 8),
+                      Text('Support'),
+                    ],
+                  ),
+                ],
+              ),
+            ],
+          ),
+      ),
+      )
+    );
+  }
+}

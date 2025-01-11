@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "49313482536",
+    "project_id": "loan-app-c9b31",
+    "storage_bucket": "loan-app-c9b31.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:49313482536:android:53670b135bc26b171f321d",
+        "android_client_info": {
+          "package_name": "com.alexisintegrated.loan_app"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCKoo5-cQGNW600-7KBWezXRcjdZ1Lw_iQ"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
