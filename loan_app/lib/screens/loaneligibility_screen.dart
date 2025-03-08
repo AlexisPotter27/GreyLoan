@@ -18,22 +18,36 @@ class _LoanEligibilityScreenState extends State<LoanEligibilityScreen> {
   // Selected values for dropdowns
   String? selectedCountry;
   String? selectedState;
-  String? selectedCity;
+  String? city;
 
   String? fullName;
   String? email;
   DateTime? selectedDate;
-  final _formKey = GlobalKey<FormState>();
+  String? selectedGender;
+
+  // Global keys to handle form validation for each country
+  final _usFormKey = GlobalKey<FormState>();
+  final _ukFormKey = GlobalKey<FormState>();
+  final _germanyFormKey = GlobalKey<FormState>();
+  final _polandFormKey = GlobalKey<FormState>();
+  final _turkeyFormKey = GlobalKey<FormState>();
+
+
   final TextEditingController addressController = TextEditingController();
   final TextEditingController cityController = TextEditingController();
   final TextEditingController stateController = TextEditingController();
   final TextEditingController zipController = TextEditingController();
   final TextEditingController idController = TextEditingController();
+  final TextEditingController phoneController = TextEditingController();
+
+  bool isLoading = false;
 
   final List<Map<String, String>> countries = [
-    {'name': 'US', 'code': 'us'},
-    {'name': 'UK', 'code': 'gb'},
     {'name': 'Germany', 'code': 'de'},
+    {'name': 'Poland', 'code': 'pl'},
+    {'name': 'Turkey', 'code': 'tur'},
+    {'name': 'UK', 'code': 'gb'},
+    {'name': 'US', 'code': 'us'},
   ];
 
   // States and cities list based on selected country
@@ -44,8 +58,8 @@ class _LoanEligibilityScreenState extends State<LoanEligibilityScreen> {
   void onCountryChanged(String? country) {
     setState(() {
       selectedCountry = country;
-      selectedState = null;  // Reset state when country changes
-      selectedCity = null;   // Reset city when country changes
+      selectedState = null; // Reset state when country changes
+      //selectedCity = null; // Reset city when country changes
       if (country != null) {
         states = countryStateCityData[country];
       } else {
@@ -58,7 +72,7 @@ class _LoanEligibilityScreenState extends State<LoanEligibilityScreen> {
   void onStateChanged(String? state) {
     setState(() {
       selectedState = state;
-      selectedCity = null;  // Reset city when state changes
+      //selectedCity = null; // Reset city when state changes
       if (state != null) {
         cities = states?[state] ?? [];
       } else {
@@ -66,7 +80,6 @@ class _LoanEligibilityScreenState extends State<LoanEligibilityScreen> {
       }
     });
   }
-
 
   @override
   void initState() {
@@ -111,23 +124,69 @@ class _LoanEligibilityScreenState extends State<LoanEligibilityScreen> {
     return random.nextInt(300) + 500;
   }
 
-  /*void _showSnackbar(String message) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(message),
-        backgroundColor: Colors.teal,
-        duration: Duration(seconds: 7),
-      ),
+  void showLoadingDialog(BuildContext context) {
+    showDialog(
+      context: context,
+      barrierDismissible:
+      false, // Prevent dismissing the dialog by tapping outside
+      builder: (BuildContext context) {
+        return AlertDialog(
+          content: Row(
+            children: [
+              CircularProgressIndicator(),
+              SizedBox(width: 20), // Space between progress bar and text
+              Text('Checking your credit report'),
+            ],
+          ),
+        );
+      },
     );
-  }*/
+  }
+
+  // Method to simulate some action that takes time
+  Future<void> simulateAction(BuildContext context) async {
+    showLoadingDialog(context);
+
+    // Simulate a delay (for example, fetching credit report)
+    await Future.delayed(Duration(seconds: 7));
+
+    // Close the dialog after the delay
+    Navigator.pop(context);
+    _submitForm();
+    _showConfirmationDialog();
+  }
+
+  // Method to validate all forms
+  void _validateForms() {
+    // Check if each form is valid
+    bool usValid = _usFormKey.currentState?.validate() ?? false;
+    bool ukValid = _ukFormKey.currentState?.validate() ?? false;
+    bool germanyValid = _germanyFormKey.currentState?.validate() ?? false;
+    bool polandValid = _polandFormKey.currentState?.validate() ?? false;
+    bool turkeyValid = _turkeyFormKey.currentState?.validate() ?? false;
+
+    // Show a message based on validation result
+    if (usValid || ukValid || germanyValid || polandValid || turkeyValid) {
+      simulateAction(context);
+    } else {
+      // One or more forms are invalid
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Please fill all required fields.')),
+      );
+    }
+  }
 
   void _showConfirmationDialog() {
+    setState(() {
+      isLoading = true;
+      Future.delayed(Duration(seconds: 3), () {});
+    });
     showDialog(
       context: context,
       builder: (BuildContext context) {
         return AlertDialog(
-          title: Text('Confirm Submission'),
-          content: Text('Are you sure you want to submit this form?'),
+          title: Text('Credit Report Checked'),
+          content: Text('Credit Check Passed!'),
           actions: [
             TextButton(
               onPressed: () {
@@ -137,8 +196,10 @@ class _LoanEligibilityScreenState extends State<LoanEligibilityScreen> {
             ),
             ElevatedButton(
               onPressed: () {
-                Navigator.of(context).push;
-                _submitForm();
+                Navigator
+                    .of(context)
+                    .push;
+                //_submitForm();
               },
               child: Text('Submit'),
             ),
@@ -149,190 +210,358 @@ class _LoanEligibilityScreenState extends State<LoanEligibilityScreen> {
   }
 
   void _submitForm() async {
-    if (_formKey.currentState!.validate()) {
-      _formKey.currentState!.save();
-      int creditScore = _generateCreditScore();
-      User? user = FirebaseAuth.instance.currentUser;
+    User? user = FirebaseAuth.instance.currentUser;
+    if (user == null) {
+      showSnackbar(context, 'User is not logged in');
+      return;
+    }
 
-      await FirebaseFirestore.instance
-          .collection('loanApplications')
-          .doc(user!.uid)
-          .set({
+    // Validate and save US form
+    if (_usFormKey.currentState != null &&
+        _usFormKey.currentState!.validate()) {
+      _usFormKey.currentState!.save();
+      int creditScore = _generateCreditScore();
+
+      await FirebaseFirestore.instance.collection('loanApplications').doc(
+          user.uid).set({
         'fullName': fullName,
         'email': email,
         'country': selectedCountry,
         'dateOfBirth': selectedDate.toString(),
+        'gender': selectedGender,
+        'phoneNumber': phoneController.text,
         'creditScore': creditScore,
         'address': addressController.text,
-        'city': selectedCity,
+        'city': city,
+        'state': selectedState,
+        'zip': zipController.text,
+        'ssn_identifier': idController.text,
+      }, SetOptions(merge: true));
+
+      showSnackbar(context, 'Form submitted successfully!');
+      Navigator.push(context,
+          MaterialPageRoute(builder: (context) => EmploymentDetailsScreen()));
+    }
+
+    // Validate and save UK form
+    if (_ukFormKey.currentState != null &&
+        _ukFormKey.currentState!.validate()) {
+      _ukFormKey.currentState!.save();
+      int creditScore = _generateCreditScore();
+
+      await FirebaseFirestore.instance.collection('loanApplications').doc(
+          user.uid).set({
+        'fullName': fullName,
+        'email': email,
+        'country': selectedCountry,
+        'dateOfBirth': selectedDate.toString(),
+        'gender': selectedGender,
+        'phoneNumber': phoneController.text,
+        'creditScore': creditScore,
+        'address': addressController.text,
+        'city': city,
         'state': selectedState,
         'zip': zipController.text,
         'ssn_identifier': idController.text,
       });
 
       showSnackbar(context, 'Form submitted successfully!');
+      Navigator.push(context,
+          MaterialPageRoute(builder: (context) => EmploymentDetailsScreen()));
+    }
 
-      Navigator.push(
-        context,
-        MaterialPageRoute(builder: (context) => EmploymentDetailsScreen()),
-      );
+    // Validate and save Germany form
+    if (_germanyFormKey.currentState != null &&
+        _germanyFormKey.currentState!.validate()) {
+      _germanyFormKey.currentState!.save();
+      int creditScore = _generateCreditScore();
+
+      await FirebaseFirestore.instance.collection('loanApplications').doc(
+          user.uid).set({
+        'fullName': fullName,
+        'email': email,
+        'country': selectedCountry,
+        'dateOfBirth': selectedDate.toString(),
+        'gender': selectedGender,
+        'phoneNumber': phoneController.text,
+        'creditScore': creditScore,
+        'address': addressController.text,
+        'city': city,
+        'state': selectedState,
+        'zip': zipController.text,
+        'ssn_identifier': idController.text,
+      });
+
+      showSnackbar(context, 'Form submitted successfully!');
+      Navigator.push(context,
+          MaterialPageRoute(builder: (context) => EmploymentDetailsScreen()));
+    }
+
+    // Validate and save Germany form
+    if (_polandFormKey.currentState != null &&
+        _polandFormKey.currentState!.validate()) {
+      _polandFormKey.currentState!.save();
+      int creditScore = _generateCreditScore();
+
+      await FirebaseFirestore.instance.collection('loanApplications').doc(
+          user.uid).set({
+        'fullName': fullName,
+        'email': email,
+        'country': selectedCountry,
+        'dateOfBirth': selectedDate.toString(),
+        'gender': selectedGender,
+        'phoneNumber': phoneController.text,
+        'creditScore': creditScore,
+        'address': addressController.text,
+        'city': city,
+        'state': selectedState,
+        'zip': zipController.text,
+        'ssn_identifier': idController.text,
+      });
+
+      showSnackbar(context, 'Form submitted successfully!');
+      Navigator.push(context,
+          MaterialPageRoute(builder: (context) => EmploymentDetailsScreen()));
+    }
+
+    // Validate and save Germany form
+    if (_turkeyFormKey.currentState != null &&
+        _turkeyFormKey.currentState!.validate()) {
+      _turkeyFormKey.currentState!.save();
+      int creditScore = _generateCreditScore();
+
+      await FirebaseFirestore.instance.collection('loanApplications').doc(
+          user.uid).set({
+        'fullName': fullName,
+        'email': email,
+        'country': selectedCountry,
+        'dateOfBirth': selectedDate.toString(),
+        'gender': selectedGender,
+        'phoneNumber': phoneController.text,
+        'creditScore': creditScore,
+        'address': addressController.text,
+        'city': city,
+        'state': selectedState,
+        'zip': zipController.text,
+        'ssn_identifier': idController.text,
+      });
+
+      showSnackbar(context, 'Form submitted successfully!');
+      Navigator.push(context,
+          MaterialPageRoute(builder: (context) => EmploymentDetailsScreen()));
     }
   }
 
-  Widget _buildUSFormFields() {
-    return Column(
-      children: [
-        //SizedBox(height: 16),
-        //Text('Date of Birth:'),
-        TextFormField(
-          readOnly: true,
-          decoration: InputDecoration(
-            hintText: selectedDate == null
-                ? 'Enter date of birth'
-                : '${selectedDate!.toLocal()}'.split(' ')[0],
-            hintStyle: TextStyle(color: Colors.black54),
-            suffixIcon: IconButton(
-              icon: Icon(Icons.calendar_today, color: Colors.lightBlue,),
-              onPressed: () => _selectDate(context),
-            ),
-            enabledBorder: OutlineInputBorder(
-              borderSide: BorderSide(color: Colors.black26),
-              borderRadius: BorderRadius.circular(10),
-            ),
-            focusedBorder: OutlineInputBorder(
-              borderSide: BorderSide(color: Colors.grey),
-              borderRadius: BorderRadius.circular(10),
-            ),
-          ),
-          validator: (value) {
-            if (selectedDate == null) {
-              return 'Please select your date of birth';
-            }
-            return null;
-          },
-        ),
-        SizedBox(height: 10),
-        //Text('Social Security Number (SSN):'),
-        TextFormField(
-          controller: idController,
-          keyboardType: TextInputType.number,
-          decoration: InputDecoration(
-            hintText: 'Enter SSN',
-            labelStyle: TextStyle(color: Colors.black54),
-            prefixIcon: Icon(Icons.security, color: Colors.lightBlue),
-            enabledBorder: OutlineInputBorder(
-              borderSide: BorderSide(color: Colors.black26),
-              borderRadius: BorderRadius.circular(10),
-            ),
-            focusedBorder: OutlineInputBorder(
-              borderSide: BorderSide(color: Colors.grey),
-              borderRadius: BorderRadius.circular(10),
-            ),
-          ),
-
-          validator: (value) {
-            if (value!.isEmpty) {
-              return 'Please enter your SSN';
-            } else if (value.length < 9 && value.length > 9){
-              return 'SSN must be 9 characters';
-            }
-            return null;
-          },
-        ),
-        SizedBox(height: 10),
-        //Text('Address'),
-        //SizedBox(height: 8,),
-        TextFormField(
-          controller: addressController,
-          decoration: InputDecoration(
-            hintText: 'House/ Block/ Building number',
-            labelStyle: TextStyle(color: Colors.black54),
-            prefixIcon: Icon(Icons.house, color: Colors.lightBlue),
-            enabledBorder: OutlineInputBorder(
-              borderSide: BorderSide(color: Colors.black26),
-              borderRadius: BorderRadius.circular(10),
-            ),
-            focusedBorder: OutlineInputBorder(
-              borderSide: BorderSide(color: Colors.grey),
-              borderRadius: BorderRadius.circular(10),
-            ),
-          ),
-          validator: (value) => value!.isEmpty ? 'House/ Block/ Building number' : null,
-        ),
-        SizedBox(height: 10),
-        // State dropdown
-        //if (selectedCountry != null)
-        DropdownButtonFormField<String>(
-            hint: Text('Select State'),
-            value: selectedState,
+  Widget buildUSFormFields() {
+    return Form(
+      key: _usFormKey,
+      child: Column(
+        children: [
+          //SizedBox(height: 16),
+          //Text('Date of Birth:'),
+          TextFormField(
+            readOnly: true,
             decoration: InputDecoration(
-              labelStyle: TextStyle(color: Colors.black54),
-              prefixIcon: Icon(Icons.map, color: Colors.lightBlue),
+              hintText: selectedDate == null
+                  ? 'Date of birth'
+                  : '${selectedDate!.toLocal()}'.split(' ')[0],
+              hintStyle: TextStyle(color: Colors.white70),
+              suffixIcon: IconButton(
+                icon: Icon(
+                  Icons.calendar_today,
+                  color: Colors.white,
+                ),
+                onPressed: () => _selectDate(context),
+              ),
               enabledBorder: OutlineInputBorder(
-                borderSide: BorderSide(color: Colors.black26),
+                borderSide: BorderSide(color: Colors.white),
                 borderRadius: BorderRadius.circular(10),
               ),
               focusedBorder: OutlineInputBorder(
-                borderSide: BorderSide(color: Colors.grey),
+                borderSide: BorderSide(color: Colors.white),
+                borderRadius: BorderRadius.circular(10),
+              ),
+            ),
+            validator: (value) {
+              if (selectedDate == null) {
+                return 'Please select your date of birth';
+              }
+              return null;
+            },
+          ),
+          SizedBox(height: 10),
+          //Text('Social Security Number (SSN):'),
+          TextFormField(
+            controller: idController,
+            style: TextStyle(color: Colors.white),
+            keyboardType: TextInputType.number,
+            decoration: InputDecoration(
+              hintText: 'SSN',
+              hintStyle: TextStyle(color: Colors.white70),
+              prefixIcon: Icon(Icons.security, color: Colors.white),
+              enabledBorder: OutlineInputBorder(
+                borderSide: BorderSide(color: Colors.white),
+                borderRadius: BorderRadius.circular(10),
+              ),
+              focusedBorder: OutlineInputBorder(
+                borderSide: BorderSide(color: Colors.white),
+                borderRadius: BorderRadius.circular(10),
+              ),
+            ),
+            validator: (value) {
+              if (value!.isEmpty) {
+                return 'Please enter your SSN';
+              } else if (value.length < 9 && value.length > 9) {
+                return 'SSN must be 9 characters';
+              }
+              return null;
+            },
+          ),
+          SizedBox(height: 10),
+          //Gender Selection
+          DropdownButtonFormField<String>(
+            hint: Text('Gender', style: TextStyle(color: Colors.white),),
+            value: selectedGender,
+            style: TextStyle(color: Colors.black),
+            decoration: InputDecoration(
+              labelStyle: TextStyle(color: Colors.white70),
+              prefixIcon: Icon(Icons.man_2_outlined, color: Colors.white),
+              enabledBorder: OutlineInputBorder(
+                borderSide: BorderSide(color: Colors.white),
+                borderRadius: BorderRadius.circular(10),
+              ),
+              focusedBorder: OutlineInputBorder(
+                borderSide: BorderSide(color: Colors.white),
+                borderRadius: BorderRadius.circular(10),
+              ),
+            ),
+            validator: (value) =>
+            value == null
+                ? 'Please select your gender'
+                : null,
+            iconEnabledColor: Colors.white,
+            onChanged: (value) {
+              setState(() {
+                selectedGender = value;
+              });
+            },
+            items: ['Male', 'Female']
+                .map((gender) =>
+                DropdownMenuItem<String>(
+                  value: gender,
+                  child: Text(gender, selectionColor: Colors.black,),
+                ))
+                .toList(),
+          ),
+          SizedBox(height: 10),
+          //Phone Number Text Field
+          TextFormField(
+            controller: phoneController,
+            style: TextStyle(color: Colors.white),
+            keyboardType: TextInputType.phone,
+            decoration: InputDecoration(
+              hintText: 'Phone number',
+              hintStyle: TextStyle(color: Colors.white70),
+              prefixIcon: Icon(Icons.phone, color: Colors.white),
+              enabledBorder: OutlineInputBorder(
+                borderSide: BorderSide(color: Colors.white),
+                borderRadius: BorderRadius.circular(10),
+              ),
+              focusedBorder: OutlineInputBorder(
+                borderSide: BorderSide(color: Colors.white),
+                borderRadius: BorderRadius.circular(10),
+              ),
+            ),
+            validator: (value) {
+              if (value!.isEmpty) {
+                return 'Please enter your phone number';
+              } else if (value.length < 10) {
+                return 'Phone number must be at least 10 digits';
+              }
+              return null;
+            },
+          ),
+          SizedBox(height: 10),
+          //Text('Address'),
+          TextFormField(
+            controller: addressController,
+            style: TextStyle(color: Colors.white),
+            decoration: InputDecoration(
+              hintText: 'House/ Block/ Building number',
+              hintStyle: TextStyle(color: Colors.white70),
+              prefixIcon: Icon(Icons.house, color: Colors.white),
+              enabledBorder: OutlineInputBorder(
+                borderSide: BorderSide(color: Colors.white),
+                borderRadius: BorderRadius.circular(10),
+              ),
+              focusedBorder: OutlineInputBorder(
+                borderSide: BorderSide(color: Colors.white),
+                borderRadius: BorderRadius.circular(10),
+              ),
+            ),
+            validator: (value) =>
+            value!.isEmpty ? 'House/ Block/ Building number' : null,
+          ),
+          SizedBox(height: 10),
+          // State dropdown
+          DropdownButtonFormField<String>(
+            hint: Text('State', style: TextStyle(color: Colors.white70),),
+            value: selectedState,
+            decoration: InputDecoration(
+              prefixIcon: Icon(Icons.map, color: Colors.white),
+              enabledBorder: OutlineInputBorder(
+                borderSide: BorderSide(color: Colors.white),
+                borderRadius: BorderRadius.circular(10),
+              ),
+              focusedBorder: OutlineInputBorder(
+                borderSide: BorderSide(color: Colors.white),
                 borderRadius: BorderRadius.circular(10),
               ),
             ),
             validator: (value) => value!.isEmpty ? 'Enter State' : null,
             onChanged: onStateChanged,
             isExpanded: true,
+            iconEnabledColor: Colors.white,
             items: states?.keys
-                .map((state) => DropdownMenuItem<String>(
-              value: state,
-              child: Text(state),
-            ))
+                .map((state) =>
+                DropdownMenuItem<String>(
+                  value: state,
+                  child: Text(state),
+                ))
                 .toList(),
           ),
-
-        /*DropdownButtonFormField<String>(
-          decoration: InputDecoration(
-            labelText: 'State',
-            prefixIcon: Icon(Icons.map, color: Colors.lightBlue),
-            enabledBorder: OutlineInputBorder(
-              borderSide: BorderSide(color: Colors.black26),
-              borderRadius: BorderRadius.circular(10),
-            ),
-            focusedBorder: OutlineInputBorder(
-              borderSide: BorderSide(color: Colors.grey),
-              borderRadius: BorderRadius.circular(10),
-            ),
-          ),
-          value: selectedState,
-          items: countryStates['US']!.map((state) {
-            return DropdownMenuItem(
-              value: state,
-              child: Text(state),
-            );
-          }).toList(),
-          onChanged: (value) {
-            setState(() {
-              selectedState = value;
-            });
-          },
-          validator: (value) => value == null ? 'Select state' : null,
-        ),*/
-
-        SizedBox(height: 10),
-
-        // City dropdown
-        //if (selectedState != null)
-        DropdownButtonFormField<String>(
-            hint: Text('Select City'),
-            value: selectedCity,
+          SizedBox(height: 10),
+          // City dropdown
+          TextFormField(
+            controller: cityController,
+            style: TextStyle(color: Colors.white),
             decoration: InputDecoration(
               hintText: 'City',
-              labelStyle: TextStyle(color: Colors.black54),
-              prefixIcon: Icon(Icons.location_city, color: Colors.lightBlue),
+              hintStyle: TextStyle(color: Colors.white70),
+              prefixIcon: Icon(Icons.location_city, color: Colors.white),
               enabledBorder: OutlineInputBorder(
-                borderSide: BorderSide(color: Colors.black26),
+                borderSide: BorderSide(color: Colors.white),
                 borderRadius: BorderRadius.circular(10),
               ),
               focusedBorder: OutlineInputBorder(
-                borderSide: BorderSide(color: Colors.grey),
+                borderSide: BorderSide(color: Colors.white),
+                borderRadius: BorderRadius.circular(10),
+              ),
+            ),
+            validator: (value) =>
+            value!.isEmpty ? 'City' : null,
+          ),
+          /*DropdownButtonFormField<String>(
+            hint: Text('City',style: TextStyle(color: Colors.white70),),
+            value: selectedCity,
+            decoration: InputDecoration(
+              prefixIcon: Icon(Icons.location_city, color: Colors.white),
+              enabledBorder: OutlineInputBorder(
+                borderSide: BorderSide(color: Colors.white),
+                borderRadius: BorderRadius.circular(10),
+              ),
+              focusedBorder: OutlineInputBorder(
+                borderSide: BorderSide(color: Colors.white),
                 borderRadius: BorderRadius.circular(10),
               ),
             ),
@@ -344,406 +573,246 @@ class _LoanEligibilityScreenState extends State<LoanEligibilityScreen> {
             },
             isExpanded: true,
             items: cities
-                .map((city) => DropdownMenuItem<String>(
-              value: city,
-              child: Text(city),
-            ))
+                .map((city) =>
+                DropdownMenuItem<String>(
+                  value: city,
+                  child: Text(city),
+                ))
+                .toList(),
+          ),*/
+          SizedBox(height: 10),
+          TextFormField(
+            controller: zipController,
+            style: TextStyle(color: Colors.white),
+            keyboardType: TextInputType.number,
+            decoration: InputDecoration(
+              hintText: 'ZIP Code',
+              hintStyle: TextStyle(color: Colors.white70),
+              prefixIcon: Icon(Icons.pin, color: Colors.white),
+              enabledBorder: OutlineInputBorder(
+                borderSide: BorderSide(color: Colors.white),
+                borderRadius: BorderRadius.circular(10),
+              ),
+              focusedBorder: OutlineInputBorder(
+                borderSide: BorderSide(color: Colors.white),
+                borderRadius: BorderRadius.circular(10),
+              ),
+            ),
+            validator: (value) => value!.isEmpty ? 'Enter ZIP code' : null,
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget buildUKFormFields() {
+    return Form(
+      key: _ukFormKey,
+      child: Column(
+        children: [
+          TextFormField(
+            readOnly: true,
+            decoration: InputDecoration(
+              hintText: selectedDate == null
+                  ? 'Date of birth'
+                  : '${selectedDate!.toLocal()}'.split(' ')[0],
+              hintStyle: TextStyle(color: Colors.white70),
+              suffixIcon: IconButton(
+                icon: Icon(
+                  Icons.calendar_today,
+                  color: Colors.white,
+                ),
+                onPressed: () => _selectDate(context),
+              ),
+              enabledBorder: OutlineInputBorder(
+                borderSide: BorderSide(color: Colors.white),
+                borderRadius: BorderRadius.circular(10),
+              ),
+              focusedBorder: OutlineInputBorder(
+                borderSide: BorderSide(color: Colors.white),
+                borderRadius: BorderRadius.circular(10),
+              ),
+            ),
+            validator: (value) {
+              if (selectedDate == null) {
+                return 'Please select your date of birth';
+              }
+              return null;
+            },
+          ),
+          SizedBox(height: 10),
+          //Text('National Insurance Number (NIN):'),
+          TextFormField(
+            controller: idController,
+            style: TextStyle(
+              color: Colors.white,
+            ),
+            keyboardType: TextInputType.number,
+            decoration: InputDecoration(
+              hintText: 'NIN',
+              hintStyle: TextStyle(color: Colors.white70),
+              prefixIcon: Icon(Icons.security, color: Colors.white),
+              enabledBorder: OutlineInputBorder(
+                borderSide: BorderSide(color: Colors.white),
+                borderRadius: BorderRadius.circular(10),
+              ),
+              focusedBorder: OutlineInputBorder(
+                borderSide: BorderSide(color: Colors.white),
+                borderRadius: BorderRadius.circular(10),
+              ),
+            ),
+            validator: (value) {
+              if (value!.isEmpty) {
+                return 'Please enter your NIN';
+              } else if (value.length < 9 && value.length > 9) {
+                return 'NIN must be 9 characters';
+              }
+              return null;
+            },
+          ),
+          SizedBox(height: 10),
+          //Gender Selection
+          DropdownButtonFormField<String>(
+            hint: Text('Gender', style: TextStyle(color: Colors.white70),),
+            value: selectedGender,
+            decoration: InputDecoration(
+              prefixIcon: Icon(Icons.man_2_outlined, color: Colors.white),
+              enabledBorder: OutlineInputBorder(
+                borderSide: BorderSide(color: Colors.white),
+                borderRadius: BorderRadius.circular(10),
+              ),
+              focusedBorder: OutlineInputBorder(
+                borderSide: BorderSide(color: Colors.white),
+                borderRadius: BorderRadius.circular(10),
+              ),
+            ),
+            validator: (value) =>
+            value == null
+                ? 'Please select your gender'
+                : null,
+            iconEnabledColor: Colors.white,
+            onChanged: (value) {
+              setState(() {
+                selectedGender = value;
+              });
+            },
+            items: ['Male', 'Female']
+                .map((gender) =>
+                DropdownMenuItem<String>(
+                  value: gender,
+                  child: Text(gender),
+                ))
                 .toList(),
           ),
-
-        /*TextFormField(
-          controller: stateController,
-          decoration: InputDecoration(
-            hintText: 'City',
-            labelStyle: TextStyle(color: Colors.black54),
-            prefixIcon: Icon(Icons.location_city, color: Colors.lightBlue),
-            enabledBorder: OutlineInputBorder(
-              borderSide: BorderSide(color: Colors.black26),
-              borderRadius: BorderRadius.circular(10),
+          SizedBox(height: 10),
+          //Phone Number Text Field
+          TextFormField(
+            controller: phoneController,
+            style: TextStyle(color: Colors.white),
+            keyboardType: TextInputType.phone,
+            decoration: InputDecoration(
+              hintText: 'Phone number',
+              hintStyle: TextStyle(color: Colors.white70),
+              prefixIcon: Icon(Icons.phone, color: Colors.white),
+              enabledBorder: OutlineInputBorder(
+                borderSide: BorderSide(color: Colors.white),
+                borderRadius: BorderRadius.circular(10),
+              ),
+              focusedBorder: OutlineInputBorder(
+                borderSide: BorderSide(color: Colors.white),
+                borderRadius: BorderRadius.circular(10),
+              ),
             ),
-            focusedBorder: OutlineInputBorder(
-              borderSide: BorderSide(color: Colors.grey),
-              borderRadius: BorderRadius.circular(10),
-            ),
+            validator: (value) {
+              if (value!.isEmpty) {
+                return 'Please enter your phone number';
+              } else if (value.length < 10) {
+                return 'Phone number must be at least 10 digits';
+              }
+              return null;
+            },
           ),
-          validator: (value) => value!.isEmpty ? 'Enter City' : null,
-        ),*/
-        SizedBox(height: 10),
-        TextFormField(
-          controller: zipController,
-          decoration: InputDecoration(
-            hintText: 'ZIP Code',
-            labelStyle: TextStyle(color: Colors.black54),
-            prefixIcon: Icon(Icons.pin, color: Colors.lightBlue),
-            enabledBorder: OutlineInputBorder(
-              borderSide: BorderSide(color: Colors.black26),
-              borderRadius: BorderRadius.circular(10),
+          SizedBox(height: 10),
+          //Text('Address'),
+          TextFormField(
+            controller: addressController,
+            style: TextStyle(color: Colors.white),
+            decoration: InputDecoration(
+              hintText: 'House/ Block/ Building number',
+              hintStyle: TextStyle(color: Colors.white70),
+              prefixIcon: Icon(Icons.house, color: Colors.white),
+              enabledBorder: OutlineInputBorder(
+                borderSide: BorderSide(color: Colors.white),
+                borderRadius: BorderRadius.circular(10),
+              ),
+              focusedBorder: OutlineInputBorder(
+                borderSide: BorderSide(color: Colors.white),
+                borderRadius: BorderRadius.circular(10),
+              ),
             ),
-            focusedBorder: OutlineInputBorder(
-              borderSide: BorderSide(color: Colors.grey),
-              borderRadius: BorderRadius.circular(10),
-            ),
+            validator: (value) =>
+            value!.isEmpty ? 'House/ Block/ Building number' : null,
           ),
-          validator: (value) => value!.isEmpty ? 'Enter ZIP code' : null,
-        ),
-      ],
-    );
-  }
-
-  Widget _buildUKFormFields() {
-    return Column(
-      children: [
-        TextFormField(
-          readOnly: true,
-          decoration: InputDecoration(
-            hintText: selectedDate == null
-                ? 'Enter date of birth'
-                : '${selectedDate!.toLocal()}'.split(' ')[0],
-            hintStyle: TextStyle(color: Colors.black12),
-            suffixIcon: IconButton(
-              icon: Icon(Icons.calendar_today, color: Colors.lightBlue,),
-              onPressed: () => _selectDate(context),
-            ),
-            enabledBorder: OutlineInputBorder(
-              borderSide: BorderSide(color: Colors.black26),
-              borderRadius: BorderRadius.circular(10),
-            ),
-            focusedBorder: OutlineInputBorder(
-              borderSide: BorderSide(color: Colors.grey),
-              borderRadius: BorderRadius.circular(10),
-            ),
-          ),
-          validator: (value) {
-            if (selectedDate == null) {
-              return 'Please select your date of birth';
-            }
-            return null;
-          },
-        ),
-        SizedBox(height: 10),
-        //Text('National Insurance Number (NIN):'),
-        TextFormField(
-          controller: idController,
-          keyboardType: TextInputType.number,
-          decoration: InputDecoration(
-            hintText: 'Enter NIN',
-            labelStyle: TextStyle(color: Colors.black12),
-            prefixIcon: Icon(Icons.security, color: Colors.lightBlue),
-            enabledBorder: OutlineInputBorder(
-              borderSide: BorderSide(color: Colors.black26),
-              borderRadius: BorderRadius.circular(10),
-            ),
-            focusedBorder: OutlineInputBorder(
-              borderSide: BorderSide(color: Colors.grey),
-              borderRadius: BorderRadius.circular(10),
-            ),
-          ),
-
-          validator: (value) {
-            if (value!.isEmpty) {
-              return 'Please enter your NIN';
-            } else if (value.length < 9 && value.length > 9){
-              return 'NIN must be 9 characters';
-            }
-            return null;
-          },
-        ),
-        SizedBox(height: 10),
-        //Text('Address'),
-        //SizedBox(height: 8,),
-        TextFormField(
-          controller: addressController,
-          decoration: InputDecoration(
-            hintText: 'House/ Block/ Building number',
-            labelStyle: TextStyle(color: Colors.black12),
-            prefixIcon: Icon(Icons.house, color: Colors.lightBlue),
-            enabledBorder: OutlineInputBorder(
-              borderSide: BorderSide(color: Colors.black26),
-              borderRadius: BorderRadius.circular(10),
-            ),
-            focusedBorder: OutlineInputBorder(
-              borderSide: BorderSide(color: Colors.grey),
-              borderRadius: BorderRadius.circular(10),
-            ),
-          ),
-          validator: (value) => value!.isEmpty ? 'House/ Block/ Building number' : null,
-        ),
-        SizedBox(height: 10),
-        // State dropdown
-        //if (selectedCountry != null)
-        DropdownButtonFormField<String>(
-          hint: Text('Select State'),
-          value: selectedState,
-          decoration: InputDecoration(
-            hintText: 'City',
-            labelStyle: TextStyle(color: Colors.black54),
-            prefixIcon: Icon(Icons.map, color: Colors.lightBlue),
-            enabledBorder: OutlineInputBorder(
-              borderSide: BorderSide(color: Colors.black26),
-              borderRadius: BorderRadius.circular(10),
-            ),
-            focusedBorder: OutlineInputBorder(
-              borderSide: BorderSide(color: Colors.grey),
-              borderRadius: BorderRadius.circular(10),
-            ),
-          ),
-          validator: (value) => value!.isEmpty ? 'Enter City' : null,
-          onChanged: onStateChanged,
-          isExpanded: true,
-          items: states?.keys
-              .map((state) => DropdownMenuItem<String>(
-            value: state,
-            child: Text(state),
-          ))
-              .toList(),
-        ),
-        /*TextFormField(
-          controller: stateController,
-          decoration: InputDecoration(
-            hintText: 'State/ Province',
-            labelStyle: TextStyle(color: Colors.black12),
-            prefixIcon: Icon(Icons.map, color: Colors.lightBlue),
-            enabledBorder: OutlineInputBorder(
-              borderSide: BorderSide(color: Colors.black26),
-              borderRadius: BorderRadius.circular(10),
-            ),
-            focusedBorder: OutlineInputBorder(
-              borderSide: BorderSide(color: Colors.grey),
-              borderRadius: BorderRadius.circular(10),
-            ),
-          ),
-          validator: (value) => value!.isEmpty ? 'Enter State/ Province' : null,
-        ),*/
-        SizedBox(height: 10),
-        // City dropdown
-        //if (selectedState != null)
-        DropdownButtonFormField<String>(
-          hint: Text('Select City'),
-          value: selectedCity,
-          decoration: InputDecoration(
-            hintText: 'City',
-            labelStyle: TextStyle(color: Colors.black54),
-            prefixIcon: Icon(Icons.location_city, color: Colors.lightBlue),
-            enabledBorder: OutlineInputBorder(
-              borderSide: BorderSide(color: Colors.black26),
-              borderRadius: BorderRadius.circular(10),
-            ),
-            focusedBorder: OutlineInputBorder(
-              borderSide: BorderSide(color: Colors.grey),
-              borderRadius: BorderRadius.circular(10),
-            ),
-          ),
-          validator: (value) => value!.isEmpty ? 'Enter City' : null,
-          onChanged: (city) {
-            setState(() {
-              selectedCity = city;
-            });
-          },
-          isExpanded: true,
-          items: cities
-              .map((city) => DropdownMenuItem<String>(
-            value: city,
-            child: Text(city),
-          ))
-              .toList(),
-        ),
-        /*TextFormField(
-          controller: cityController,
-          decoration: InputDecoration(
-            hintText: 'City',
-            labelStyle: TextStyle(color: Colors.black12),
-            prefixIcon: Icon(Icons.location_city, color: Colors.lightBlue),
-            enabledBorder: OutlineInputBorder(
-              borderSide: BorderSide(color: Colors.black26),
-              borderRadius: BorderRadius.circular(10),
-            ),
-            focusedBorder: OutlineInputBorder(
-              borderSide: BorderSide(color: Colors.grey),
-              borderRadius: BorderRadius.circular(10),
-            ),
-          ),
-          validator: (value) => value!.isEmpty ? 'Enter City' : null,
-        ),*/
-        SizedBox(height: 10),
-        //Zip Code
-        TextFormField(
-          controller: zipController,
-          decoration: InputDecoration(
-            hintText: 'ZIP Code',
-            labelStyle: TextStyle(color: Colors.black12),
-            prefixIcon: Icon(Icons.pin, color: Colors.lightBlue),
-            enabledBorder: OutlineInputBorder(
-              borderSide: BorderSide(color: Colors.black26),
-              borderRadius: BorderRadius.circular(10),
-            ),
-            focusedBorder: OutlineInputBorder(
-              borderSide: BorderSide(color: Colors.grey),
-              borderRadius: BorderRadius.circular(10),
-            ),
-          ),
-          validator: (value) => value!.isEmpty ? 'Enter ZIP code' : null,
-        ),
-
-        /*TextFormField(
-          controller: cityController,
-          decoration: InputDecoration(
-            labelText: 'City',
-            prefixIcon: Icon(Icons.location_city, color: Colors.blueGrey),
-          ),
-          validator: (value) => value!.isEmpty ? 'Enter city' : null,
-        ),
-        TextFormField(
-          controller: addressController,
-          decoration: InputDecoration(
-            labelText: 'Street Address',
-            prefixIcon: Icon(Icons.streetview, color: Colors.blueGrey),
-          ),
-          validator: (value) => value!.isEmpty ? 'Enter street address' : null,
-        ),*/
-      ],
-    );
-  }
-
-  Widget _buildGermanyFormFields() {
-    return Column(
-      children: [
-        TextFormField(
-          readOnly: true,
-          decoration: InputDecoration(
-            hintText: selectedDate == null
-                ? 'Enter date of birth'
-                : '${selectedDate!.toLocal()}'.split(' ')[0],
-            hintStyle: TextStyle(color: Colors.black12),
-            suffixIcon: IconButton(
-              icon: Icon(Icons.calendar_today, color: Colors.lightBlue,),
-              onPressed: () => _selectDate(context),
-            ),
-            enabledBorder: OutlineInputBorder(
-              borderSide: BorderSide(color: Colors.black26),
-              borderRadius: BorderRadius.circular(10),
-            ),
-            focusedBorder: OutlineInputBorder(
-              borderSide: BorderSide(color: Colors.grey),
-              borderRadius: BorderRadius.circular(10),
-            ),
-          ),
-          validator: (value) {
-            if (selectedDate == null) {
-              return 'Please select your date of birth';
-            }
-            return null;
-          },
-        ),
-        SizedBox(height: 10),
-        //Text('SCHUFA Number:'),
-        TextFormField(
-          controller: idController,
-          keyboardType: TextInputType.number,
-          decoration: InputDecoration(
-            hintText: 'Enter SCHUFA Number',
-            labelStyle: TextStyle(color: Colors.black12),
-            prefixIcon: Icon(Icons.security, color: Colors.lightBlue),
-            enabledBorder: OutlineInputBorder(
-              borderSide: BorderSide(color: Colors.black26),
-              borderRadius: BorderRadius.circular(10),
-            ),
-            focusedBorder: OutlineInputBorder(
-              borderSide: BorderSide(color: Colors.grey),
-              borderRadius: BorderRadius.circular(10),
-            ),
-          ),
-
-          validator: (value) {
-            if (value!.isEmpty) {
-              return 'Please enter your SCHUFA Number';
-            } else if (value.length < 9 && value.length > 9){
-              return 'SCHUFA Number must be 9 characters';
-            }
-            return null;
-          },
-        ),
-        SizedBox(height: 10),
-        //Text('Address'),
-        //SizedBox(height: 8,),
-        TextFormField(
-          controller: addressController,
-          decoration: InputDecoration(
-            hintText: 'House/ Block/ Building number',
-            labelStyle: TextStyle(color: Colors.black12),
-            prefixIcon: Icon(Icons.house, color: Colors.lightBlue),
-            enabledBorder: OutlineInputBorder(
-              borderSide: BorderSide(color: Colors.black26),
-              borderRadius: BorderRadius.circular(10),
-            ),
-            focusedBorder: OutlineInputBorder(
-              borderSide: BorderSide(color: Colors.grey),
-              borderRadius: BorderRadius.circular(10),
-            ),
-          ),
-          validator: (value) => value!.isEmpty ? 'House/ Block/ Building number' : null,
-        ),
-        SizedBox(height: 10),
-        // State dropdown
-        if (selectedCountry != null)
+          SizedBox(height: 10),
+          // State dropdown
           DropdownButtonFormField<String>(
-            hint: Text('Select State'),
+            hint: Text('State', style: TextStyle(color: Colors.white70),),
             value: selectedState,
             decoration: InputDecoration(
-              //hintText: 'City',
-              labelStyle: TextStyle(color: Colors.black54),
-              prefixIcon: Icon(Icons.map, color: Colors.lightBlue),
+              prefixIcon: Icon(Icons.map, color: Colors.white),
               enabledBorder: OutlineInputBorder(
-                borderSide: BorderSide(color: Colors.black26),
+                borderSide: BorderSide(color: Colors.white),
                 borderRadius: BorderRadius.circular(10),
               ),
               focusedBorder: OutlineInputBorder(
-                borderSide: BorderSide(color: Colors.grey),
+                borderSide: BorderSide(color: Colors.white),
                 borderRadius: BorderRadius.circular(10),
               ),
             ),
-            validator: (value) => value!.isEmpty ? 'Enter State' : null,
+            validator: (value) => value!.isEmpty ? 'Enter City' : null,
             onChanged: onStateChanged,
             isExpanded: true,
+            iconEnabledColor: Colors.white,
             items: states?.keys
-                .map((state) => DropdownMenuItem<String>(
-              value: state,
-              child: Text(state),
-            ))
+                .map((state) =>
+                DropdownMenuItem<String>(
+                  value: state,
+                  child: Text(state),
+                ))
                 .toList(),
           ),
-        /*TextFormField(
-          controller: stateController,
-          decoration: InputDecoration(
-            hintText: 'State/ Province',
-            labelStyle: TextStyle(color: Colors.black12),
-            prefixIcon: Icon(Icons.map, color: Colors.lightBlue),
-            enabledBorder: OutlineInputBorder(
-              borderSide: BorderSide(color: Colors.black26),
-              borderRadius: BorderRadius.circular(10),
-            ),
-            focusedBorder: OutlineInputBorder(
-              borderSide: BorderSide(color: Colors.grey),
-              borderRadius: BorderRadius.circular(10),
-            ),
-          ),
-          validator: (value) => value!.isEmpty ? 'Enter state' : null,
-        ),*/
-        SizedBox(height: 10),
-        // City dropdown
-        if (selectedState != null)
-          DropdownButtonFormField<String>(
-            hint: Text('Select City'),
-            value: selectedCity,
+          SizedBox(height: 10),
+          // City dropdown
+          TextFormField(
+            controller: cityController,
+            style: TextStyle(color: Colors.white),
             decoration: InputDecoration(
               hintText: 'City',
-              labelStyle: TextStyle(color: Colors.black54),
-              prefixIcon: Icon(Icons.location_city, color: Colors.lightBlue),
+              hintStyle: TextStyle(color: Colors.white70),
+              prefixIcon: Icon(Icons.location_city, color: Colors.white),
               enabledBorder: OutlineInputBorder(
-                borderSide: BorderSide(color: Colors.black26),
+                borderSide: BorderSide(color: Colors.white),
                 borderRadius: BorderRadius.circular(10),
               ),
               focusedBorder: OutlineInputBorder(
-                borderSide: BorderSide(color: Colors.grey),
+                borderSide: BorderSide(color: Colors.white),
+                borderRadius: BorderRadius.circular(10),
+              ),
+            ),
+            validator: (value) =>
+            value!.isEmpty ? 'City' : null,
+          ),
+          /*DropdownButtonFormField<String>(
+            hint: Text('City',style: TextStyle(color: Colors.white70),),
+            value: selectedCity,
+            decoration: InputDecoration(
+              prefixIcon: Icon(Icons.location_city, color: Colors.white),
+              enabledBorder: OutlineInputBorder(
+                borderSide: BorderSide(color: Colors.white),
+                borderRadius: BorderRadius.circular(10),
+              ),
+              focusedBorder: OutlineInputBorder(
+                borderSide: BorderSide(color: Colors.white),
                 borderRadius: BorderRadius.circular(10),
               ),
             ),
@@ -754,113 +823,868 @@ class _LoanEligibilityScreenState extends State<LoanEligibilityScreen> {
               });
             },
             isExpanded: true,
+            iconEnabledColor: Colors.white,
             items: cities
-                .map((city) => DropdownMenuItem<String>(
-              value: city,
-              child: Text(city),
-            ))
+                .map((city) =>
+                DropdownMenuItem<String>(
+                  value: city,
+                  child: Text(city),
+                ))
                 .toList(),
+          ),*/
+          SizedBox(height: 10),
+          //Zip Code
+          TextFormField(
+            controller: zipController,
+            style: TextStyle(color: Colors.white),
+            keyboardType: TextInputType.number,
+            decoration: InputDecoration(
+              hintText: 'ZIP Code',
+              hintStyle: TextStyle(color: Colors.white70),
+              prefixIcon: Icon(Icons.pin, color: Colors.white),
+              enabledBorder: OutlineInputBorder(
+                borderSide: BorderSide(color: Colors.white),
+                borderRadius: BorderRadius.circular(10),
+              ),
+              focusedBorder: OutlineInputBorder(
+                borderSide: BorderSide(color: Colors.white),
+                borderRadius: BorderRadius.circular(10),
+              ),
+            ),
+            validator: (value) => value!.isEmpty ? 'Enter ZIP code' : null,
           ),
-        /*TextFormField(
-          controller: cityController,
-          decoration: InputDecoration(
-            hintText: 'City',
-            labelStyle: TextStyle(color: Colors.black12),
-            prefixIcon: Icon(Icons.location_city, color: Colors.lightBlue),
-            enabledBorder: OutlineInputBorder(
-              borderSide: BorderSide(color: Colors.black26),
-              borderRadius: BorderRadius.circular(10),
-            ),
-            focusedBorder: OutlineInputBorder(
-              borderSide: BorderSide(color: Colors.grey),
-              borderRadius: BorderRadius.circular(10),
-            ),
-          ),
-          validator: (value) => value!.isEmpty ? 'Enter City' : null,
-        ),*/
-        SizedBox(height: 10),
-        //Zip Code
-        TextFormField(
-          controller: zipController,
-          decoration: InputDecoration(
-            hintText: 'ZIP Code',
-            labelStyle: TextStyle(color: Colors.black12),
-            prefixIcon: Icon(Icons.pin, color: Colors.lightBlue),
-            enabledBorder: OutlineInputBorder(
-              borderSide: BorderSide(color: Colors.black26),
-              borderRadius: BorderRadius.circular(10),
-            ),
-            focusedBorder: OutlineInputBorder(
-              borderSide: BorderSide(color: Colors.grey),
-              borderRadius: BorderRadius.circular(10),
-            ),
-          ),
-          validator: (value) => value!.isEmpty ? 'Enter ZIP code' : null,
-        ),
-      ],
+        ],
+      ),
     );
   }
 
+  Widget buildGermanyFormFields() {
+    return Form(
+      key: _germanyFormKey,
+      child: Column(
+        children: [
+          //Date of Birth
+          TextFormField(
+            readOnly: true,
+            decoration: InputDecoration(
+              hintText: selectedDate == null
+                  ? 'Date of birth'
+                  : '${selectedDate!.toLocal()}'.split(' ')[0],
+              hintStyle: TextStyle(color: Colors.white70),
+              suffixIcon: IconButton(
+                icon: Icon(
+                  Icons.calendar_today,
+                  color: Colors.white,
+                ),
+                onPressed: () => _selectDate(context),
+              ),
+              enabledBorder: OutlineInputBorder(
+                borderSide: BorderSide(color: Colors.white),
+                borderRadius: BorderRadius.circular(10),
+              ),
+              focusedBorder: OutlineInputBorder(
+                borderSide: BorderSide(color: Colors.white),
+                borderRadius: BorderRadius.circular(10),
+              ),
+            ),
+            validator: (value) {
+              if (selectedDate == null) {
+                return 'Please select your date of birth';
+              }
+              return null;
+            },
+          ),
+          SizedBox(height: 10),
+          //Text('Steuer-ID (Tax ID):'),
+          TextFormField(
+            controller: idController,
+            style: TextStyle(
+              color: Colors.white,
+            ),
+            keyboardType: TextInputType.number,
+            decoration: InputDecoration(
+              hintText: 'Steuer-ID (Tax ID)',
+              hintStyle: TextStyle(color: Colors.white70),
+              prefixIcon: Icon(Icons.security, color: Colors.white),
+              enabledBorder: OutlineInputBorder(
+                borderSide: BorderSide(color: Colors.white),
+                borderRadius: BorderRadius.circular(10),
+              ),
+              focusedBorder: OutlineInputBorder(
+                borderSide: BorderSide(color: Colors.white),
+                borderRadius: BorderRadius.circular(10),
+              ),
+            ),
+            validator: (value) {
+              if (value!.isEmpty) {
+                return 'Please enter your Steuer-ID (Tax ID)';
+              } else if (value.length < 11 && value.length > 11) {
+                return 'Steuer-ID (Tax ID) must be 9 characters';
+              }
+              return null;
+            },
+          ),
+          //Gender Selection
+          SizedBox(height: 10),
+          DropdownButtonFormField<String>(
+            hint: Text('Gender', style: TextStyle(color: Colors.white70),),
+            value: selectedGender,
+            decoration: InputDecoration(
+              labelStyle: TextStyle(color: Colors.white),
+              prefixIcon: Icon(Icons.man_2_outlined, color: Colors.white),
+              enabledBorder: OutlineInputBorder(
+                borderSide: BorderSide(color: Colors.white),
+                borderRadius: BorderRadius.circular(10),
+              ),
+              focusedBorder: OutlineInputBorder(
+                borderSide: BorderSide(color: Colors.white),
+                borderRadius: BorderRadius.circular(10),
+              ),
+            ),
+            validator: (value) =>
+            value == null
+                ? 'Please select your gender'
+                : null,
+            iconEnabledColor: Colors.white,
+            onChanged: (value) {
+              setState(() {
+                selectedGender = value;
+              });
+            },
+            items: ['Male', 'Female']
+                .map((gender) =>
+                DropdownMenuItem<String>(
+                  value: gender,
+                  child: Text(gender),
+                ))
+                .toList(),
+          ),
+          SizedBox(height: 10),
+          //Phone Number Text Field
+          TextFormField(
+            controller: phoneController,
+            style: TextStyle(color: Colors.white),
+            keyboardType: TextInputType.phone,
+            decoration: InputDecoration(
+              hintText: 'Phone number',
+              hintStyle: TextStyle(color: Colors.white70),
+              prefixIcon: Icon(Icons.phone, color: Colors.white),
+              enabledBorder: OutlineInputBorder(
+                borderSide: BorderSide(color: Colors.white),
+                borderRadius: BorderRadius.circular(10),
+              ),
+              focusedBorder: OutlineInputBorder(
+                borderSide: BorderSide(color: Colors.white),
+                borderRadius: BorderRadius.circular(10),
+              ),
+            ),
+            validator: (value) {
+              if (value!.isEmpty) {
+                return 'Please enter your phone number';
+              } else if (value.length < 10) {
+                return 'Phone number must be at least 10 digits';
+              }
+              return null;
+            },
+          ),
+          SizedBox(height: 10),
+          //Text('Address'),
+          TextFormField(
+            controller: addressController,
+            style: TextStyle(color: Colors.white),
+            decoration: InputDecoration(
+              hintText: 'House/ Block/ Building number',
+              hintStyle: TextStyle(color: Colors.white70),
+              prefixIcon: Icon(Icons.house, color: Colors.white),
+              enabledBorder: OutlineInputBorder(
+                borderSide: BorderSide(color: Colors.white),
+                borderRadius: BorderRadius.circular(10),
+              ),
+              focusedBorder: OutlineInputBorder(
+                borderSide: BorderSide(color: Colors.white),
+                borderRadius: BorderRadius.circular(10),
+              ),
+            ),
+            validator: (value) =>
+            value!.isEmpty ? 'House/ Block/ Building number' : null,
+          ),
+          SizedBox(height: 10),
+          // State dropdown
+          DropdownButtonFormField<String>(
+            hint: Text('State', style: TextStyle(color: Colors.white70),),
+            value: selectedState,
+            decoration: InputDecoration(
+              prefixIcon: Icon(Icons.map, color: Colors.white),
+              enabledBorder: OutlineInputBorder(
+                borderSide: BorderSide(color: Colors.white),
+                borderRadius: BorderRadius.circular(10),
+              ),
+              focusedBorder: OutlineInputBorder(
+                borderSide: BorderSide(color: Colors.white),
+                borderRadius: BorderRadius.circular(10),
+              ),
+            ),
+            validator: (value) => value!.isEmpty ? 'Enter State' : null,
+            onChanged: onStateChanged,
+            isExpanded: true,
+            iconEnabledColor: Colors.white,
+            items: states?.keys
+                .map((state) =>
+                DropdownMenuItem<String>(
+                  value: state,
+                  child: Text(state),
+                ))
+                .toList(),
+          ),
+          SizedBox(height: 10),
+          // City dropdown
+          TextFormField(
+            controller: cityController,
+            style: TextStyle(color: Colors.white),
+            decoration: InputDecoration(
+              hintText: 'City',
+              hintStyle: TextStyle(color: Colors.white70),
+              prefixIcon: Icon(Icons.location_city, color: Colors.white),
+              enabledBorder: OutlineInputBorder(
+                borderSide: BorderSide(color: Colors.white),
+                borderRadius: BorderRadius.circular(10),
+              ),
+              focusedBorder: OutlineInputBorder(
+                borderSide: BorderSide(color: Colors.white),
+                borderRadius: BorderRadius.circular(10),
+              ),
+            ),
+            validator: (value) =>
+            value!.isEmpty ? 'City' : null,
+          ),
+          /*DropdownButtonFormField<String>(
+            hint: Text('City', style: TextStyle(color: Colors.white70),),
+            value: selectedCity,
+            decoration: InputDecoration(
+              prefixIcon: Icon(Icons.location_city, color: Colors.white),
+              enabledBorder: OutlineInputBorder(
+                borderSide: BorderSide(color: Colors.white),
+                borderRadius: BorderRadius.circular(10),
+              ),
+              focusedBorder: OutlineInputBorder(
+                borderSide: BorderSide(color: Colors.white),
+                borderRadius: BorderRadius.circular(10),
+              ),
+            ),
+            validator: (value) => value!.isEmpty ? 'Enter City' : null,
+            onChanged: (city) {
+              setState(() {
+                selectedCity = city;
+              });
+            },
+            isExpanded: true,
+            iconEnabledColor: Colors.white,
+            items: cities
+                .map((city) =>
+                DropdownMenuItem<String>(
+                  value: city,
+                  child: Text(city),
+                ))
+                .toList(),
+          ),*/
+          SizedBox(height: 10),
+          //Zip Code
+          TextFormField(
+            controller: zipController,
+            style: TextStyle(color: Colors.white),
+            keyboardType: TextInputType.number,
+            decoration: InputDecoration(
+              hintText: 'ZIP Code',
+              hintStyle: TextStyle(color: Colors.white70),
+              prefixIcon: Icon(Icons.pin, color: Colors.white),
+              enabledBorder: OutlineInputBorder(
+                borderSide: BorderSide(color: Colors.white),
+                borderRadius: BorderRadius.circular(10),
+              ),
+              focusedBorder: OutlineInputBorder(
+                borderSide: BorderSide(color: Colors.white),
+                borderRadius: BorderRadius.circular(10),
+              ),
+            ),
+            validator: (value) => value!.isEmpty ? 'Enter ZIP code' : null,
+          ),
+        ],
+      ),
+    );
+  }
 
+  Widget buildPolandFormFields() {
+    return Form(
+      key: _polandFormKey,
+      child: Column(
+        children: [
+          //Date of Birth
+          TextFormField(
+            readOnly: true,
+            decoration: InputDecoration(
+              hintText: selectedDate == null
+                  ? 'Date of birth'
+                  : '${selectedDate!.toLocal()}'.split(' ')[0],
+              hintStyle: TextStyle(color: Colors.white70),
+              suffixIcon: IconButton(
+                icon: Icon(
+                  Icons.calendar_today,
+                  color: Colors.white,
+                ),
+                onPressed: () => _selectDate(context),
+              ),
+              enabledBorder: OutlineInputBorder(
+                borderSide: BorderSide(color: Colors.white),
+                borderRadius: BorderRadius.circular(10),
+              ),
+              focusedBorder: OutlineInputBorder(
+                borderSide: BorderSide(color: Colors.white),
+                borderRadius: BorderRadius.circular(10),
+              ),
+            ),
+            validator: (value) {
+              if (selectedDate == null) {
+                return 'Please select your date of birth';
+              }
+              return null;
+            },
+          ),
+          SizedBox(height: 10),
+          //Text('PESEL Number:'),
+          TextFormField(
+            controller: idController,
+            style: TextStyle(
+              color: Colors.white,
+            ),
+            keyboardType: TextInputType.number,
+            decoration: InputDecoration(
+              hintText: 'PESEL Number',
+              hintStyle: TextStyle(color: Colors.white70),
+              prefixIcon: Icon(Icons.security, color: Colors.white),
+              enabledBorder: OutlineInputBorder(
+                borderSide: BorderSide(color: Colors.white),
+                borderRadius: BorderRadius.circular(10),
+              ),
+              focusedBorder: OutlineInputBorder(
+                borderSide: BorderSide(color: Colors.white),
+                borderRadius: BorderRadius.circular(10),
+              ),
+            ),
+            validator: (value) {
+              if (value!.isEmpty) {
+                return 'Please enter your PESEL Number';
+              } else if (value.length < 11 && value.length > 11) {
+                return 'PESEL Number must be 11 characters';
+              }
+              return null;
+            },
+          ),
+          //Gender Selection
+          SizedBox(height: 10),
+          DropdownButtonFormField<String>(
+            hint: Text('Gender', style: TextStyle(color: Colors.white70),),
+            value: selectedGender,
+            decoration: InputDecoration(
+              labelStyle: TextStyle(color: Colors.white),
+              prefixIcon: Icon(Icons.man_2_outlined, color: Colors.white),
+              enabledBorder: OutlineInputBorder(
+                borderSide: BorderSide(color: Colors.white),
+                borderRadius: BorderRadius.circular(10),
+              ),
+              focusedBorder: OutlineInputBorder(
+                borderSide: BorderSide(color: Colors.white),
+                borderRadius: BorderRadius.circular(10),
+              ),
+            ),
+            validator: (value) =>
+            value == null
+                ? 'Please select your gender'
+                : null,
+            iconEnabledColor: Colors.white,
+            onChanged: (value) {
+              setState(() {
+                selectedGender = value;
+              });
+            },
+            items: ['Male', 'Female']
+                .map((gender) =>
+                DropdownMenuItem<String>(
+                  value: gender,
+                  child: Text(gender),
+                ))
+                .toList(),
+          ),
+          SizedBox(height: 10),
+          //Phone Number Text Field
+          TextFormField(
+            controller: phoneController,
+            style: TextStyle(color: Colors.white),
+            keyboardType: TextInputType.phone,
+            decoration: InputDecoration(
+              hintText: 'Phone number',
+              hintStyle: TextStyle(color: Colors.white70),
+              prefixIcon: Icon(Icons.phone, color: Colors.white),
+              enabledBorder: OutlineInputBorder(
+                borderSide: BorderSide(color: Colors.white),
+                borderRadius: BorderRadius.circular(10),
+              ),
+              focusedBorder: OutlineInputBorder(
+                borderSide: BorderSide(color: Colors.white),
+                borderRadius: BorderRadius.circular(10),
+              ),
+            ),
+            validator: (value) {
+              if (value!.isEmpty) {
+                return 'Please enter your phone number';
+              } else if (value.length < 10) {
+                return 'Phone number must be at least 10 digits';
+              }
+              return null;
+            },
+          ),
+          SizedBox(height: 10),
+          //Text('Address'),
+          TextFormField(
+            controller: addressController,
+            style: TextStyle(color: Colors.white),
+            decoration: InputDecoration(
+              hintText: 'House/ Block/ Building number',
+              hintStyle: TextStyle(color: Colors.white70),
+              prefixIcon: Icon(Icons.house, color: Colors.white),
+              enabledBorder: OutlineInputBorder(
+                borderSide: BorderSide(color: Colors.white),
+                borderRadius: BorderRadius.circular(10),
+              ),
+              focusedBorder: OutlineInputBorder(
+                borderSide: BorderSide(color: Colors.white),
+                borderRadius: BorderRadius.circular(10),
+              ),
+            ),
+            validator: (value) =>
+            value!.isEmpty ? 'House/ Block/ Building number' : null,
+          ),
+          SizedBox(height: 10),
+          // State dropdown
+          DropdownButtonFormField<String>(
+            hint: Text('State', style: TextStyle(color: Colors.white70),),
+            value: selectedState,
+            decoration: InputDecoration(
+              prefixIcon: Icon(Icons.map, color: Colors.white),
+              enabledBorder: OutlineInputBorder(
+                borderSide: BorderSide(color: Colors.white),
+                borderRadius: BorderRadius.circular(10),
+              ),
+              focusedBorder: OutlineInputBorder(
+                borderSide: BorderSide(color: Colors.white),
+                borderRadius: BorderRadius.circular(10),
+              ),
+            ),
+            validator: (value) => value!.isEmpty ? 'Enter State' : null,
+            onChanged: onStateChanged,
+            isExpanded: true,
+            iconEnabledColor: Colors.white,
+            items: states?.keys
+                .map((state) =>
+                DropdownMenuItem<String>(
+                  value: state,
+                  child: Text(state),
+                ))
+                .toList(),
+          ),
+          SizedBox(height: 10),
+          // City dropdown
+          TextFormField(
+            controller: cityController,
+            style: TextStyle(color: Colors.white),
+            decoration: InputDecoration(
+              hintText: 'City',
+              hintStyle: TextStyle(color: Colors.white70),
+              prefixIcon: Icon(Icons.location_city, color: Colors.white),
+              enabledBorder: OutlineInputBorder(
+                borderSide: BorderSide(color: Colors.white),
+                borderRadius: BorderRadius.circular(10),
+              ),
+              focusedBorder: OutlineInputBorder(
+                borderSide: BorderSide(color: Colors.white),
+                borderRadius: BorderRadius.circular(10),
+              ),
+            ),
+            validator: (value) =>
+            value!.isEmpty ? 'City' : null,
+          ),
+          /*DropdownButtonFormField<String>(
+            hint: Text('City', style: TextStyle(color: Colors.white70),),
+            value: selectedCity,
+            decoration: InputDecoration(
+              prefixIcon: Icon(Icons.location_city, color: Colors.white),
+              enabledBorder: OutlineInputBorder(
+                borderSide: BorderSide(color: Colors.white),
+                borderRadius: BorderRadius.circular(10),
+              ),
+              focusedBorder: OutlineInputBorder(
+                borderSide: BorderSide(color: Colors.white),
+                borderRadius: BorderRadius.circular(10),
+              ),
+            ),
+            validator: (value) => value!.isEmpty ? 'Enter City' : null,
+            onChanged: (city) {
+              setState(() {
+                selectedCity = city;
+              });
+            },
+            isExpanded: true,
+            iconEnabledColor: Colors.white,
+            items: cities
+                .map((city) =>
+                DropdownMenuItem<String>(
+                  value: city,
+                  child: Text(city),
+                ))
+                .toList(),
+          ),*/
+          SizedBox(height: 10),
+          //Zip Code
+          TextFormField(
+            controller: zipController,
+            style: TextStyle(color: Colors.white),
+            keyboardType: TextInputType.number,
+            decoration: InputDecoration(
+              hintText: 'ZIP Code',
+              hintStyle: TextStyle(color: Colors.white70),
+              prefixIcon: Icon(Icons.pin, color: Colors.white),
+              enabledBorder: OutlineInputBorder(
+                borderSide: BorderSide(color: Colors.white),
+                borderRadius: BorderRadius.circular(10),
+              ),
+              focusedBorder: OutlineInputBorder(
+                borderSide: BorderSide(color: Colors.white),
+                borderRadius: BorderRadius.circular(10),
+              ),
+            ),
+            validator: (value) => value!.isEmpty ? 'Enter ZIP code' : null,
+          ),
+        ],
+      ),
+    );
+  }
 
-  Widget _buildDynamicForm() {
+  Widget buildTurkeyFormFields() {
+    return Form(
+      key: _turkeyFormKey,
+      child: Column(
+        children: [
+          //Date of Birth
+          TextFormField(
+            readOnly: true,
+            decoration: InputDecoration(
+              hintText: selectedDate == null
+                  ? 'Date of birth'
+                  : '${selectedDate!.toLocal()}'.split(' ')[0],
+              hintStyle: TextStyle(color: Colors.white70),
+              suffixIcon: IconButton(
+                icon: Icon(
+                  Icons.calendar_today,
+                  color: Colors.white,
+                ),
+                onPressed: () => _selectDate(context),
+              ),
+              enabledBorder: OutlineInputBorder(
+                borderSide: BorderSide(color: Colors.white),
+                borderRadius: BorderRadius.circular(10),
+              ),
+              focusedBorder: OutlineInputBorder(
+                borderSide: BorderSide(color: Colors.white),
+                borderRadius: BorderRadius.circular(10),
+              ),
+            ),
+            validator: (value) {
+              if (selectedDate == null) {
+                return 'Please select your date of birth';
+              }
+              return null;
+            },
+          ),
+          SizedBox(height: 10),
+          //Text('TCKN Number:'),
+          TextFormField(
+            controller: idController,
+            style: TextStyle(
+              color: Colors.white,
+            ),
+            keyboardType: TextInputType.number,
+            decoration: InputDecoration(
+              hintText: 'TCKN',
+              hintStyle: TextStyle(color: Colors.white70),
+              prefixIcon: Icon(Icons.security, color: Colors.white),
+              enabledBorder: OutlineInputBorder(
+                borderSide: BorderSide(color: Colors.white),
+                borderRadius: BorderRadius.circular(10),
+              ),
+              focusedBorder: OutlineInputBorder(
+                borderSide: BorderSide(color: Colors.white),
+                borderRadius: BorderRadius.circular(10),
+              ),
+            ),
+            validator: (value) {
+              if (value!.isEmpty) {
+                return 'Please enter your TCKN';
+              } else if (value.length < 11 && value.length > 11) {
+                return 'TCKN must be 11 characters';
+              }
+              return null;
+            },
+          ),
+          //Gender Selection
+          SizedBox(height: 10),
+          DropdownButtonFormField<String>(
+            hint: Text('Gender', style: TextStyle(color: Colors.white70),),
+            value: selectedGender,
+            decoration: InputDecoration(
+              labelStyle: TextStyle(color: Colors.white),
+              prefixIcon: Icon(Icons.man_2_outlined, color: Colors.white),
+              enabledBorder: OutlineInputBorder(
+                borderSide: BorderSide(color: Colors.white),
+                borderRadius: BorderRadius.circular(10),
+              ),
+              focusedBorder: OutlineInputBorder(
+                borderSide: BorderSide(color: Colors.white),
+                borderRadius: BorderRadius.circular(10),
+              ),
+            ),
+            validator: (value) =>
+            value == null
+                ? 'Please select your gender'
+                : null,
+            iconEnabledColor: Colors.white,
+            onChanged: (value) {
+              setState(() {
+                selectedGender = value;
+              });
+            },
+            items: ['Male', 'Female']
+                .map((gender) =>
+                DropdownMenuItem<String>(
+                  value: gender,
+                  child: Text(gender),
+                ))
+                .toList(),
+          ),
+          SizedBox(height: 10),
+          //Phone Number Text Field
+          TextFormField(
+            controller: phoneController,
+            style: TextStyle(color: Colors.white),
+            keyboardType: TextInputType.phone,
+            decoration: InputDecoration(
+              hintText: 'Phone number',
+              hintStyle: TextStyle(color: Colors.white70),
+              prefixIcon: Icon(Icons.phone, color: Colors.white),
+              enabledBorder: OutlineInputBorder(
+                borderSide: BorderSide(color: Colors.white),
+                borderRadius: BorderRadius.circular(10),
+              ),
+              focusedBorder: OutlineInputBorder(
+                borderSide: BorderSide(color: Colors.white),
+                borderRadius: BorderRadius.circular(10),
+              ),
+            ),
+            validator: (value) {
+              if (value!.isEmpty) {
+                return 'Please enter your phone number';
+              } else if (value.length < 10) {
+                return 'Phone number must be at least 10 digits';
+              }
+              return null;
+            },
+          ),
+          SizedBox(height: 10),
+          //Text('Address'),
+          TextFormField(
+            controller: addressController,
+            style: TextStyle(color: Colors.white),
+            decoration: InputDecoration(
+              hintText: 'House/ Block/ Building number',
+              hintStyle: TextStyle(color: Colors.white70),
+              prefixIcon: Icon(Icons.house, color: Colors.white),
+              enabledBorder: OutlineInputBorder(
+                borderSide: BorderSide(color: Colors.white),
+                borderRadius: BorderRadius.circular(10),
+              ),
+              focusedBorder: OutlineInputBorder(
+                borderSide: BorderSide(color: Colors.white),
+                borderRadius: BorderRadius.circular(10),
+              ),
+            ),
+            validator: (value) =>
+            value!.isEmpty ? 'House/ Block/ Building number' : null,
+          ),
+          SizedBox(height: 10),
+          // State dropdown
+          DropdownButtonFormField<String>(
+            hint: Text('State', style: TextStyle(color: Colors.white70),),
+            value: selectedState,
+            decoration: InputDecoration(
+              prefixIcon: Icon(Icons.map, color: Colors.white),
+              enabledBorder: OutlineInputBorder(
+                borderSide: BorderSide(color: Colors.white),
+                borderRadius: BorderRadius.circular(10),
+              ),
+              focusedBorder: OutlineInputBorder(
+                borderSide: BorderSide(color: Colors.white),
+                borderRadius: BorderRadius.circular(10),
+              ),
+            ),
+            validator: (value) => value!.isEmpty ? 'Enter State' : null,
+            onChanged: onStateChanged,
+            isExpanded: true,
+            iconEnabledColor: Colors.white,
+            items: states?.keys
+                .map((state) =>
+                DropdownMenuItem<String>(
+                  value: state,
+                  child: Text(state),
+                ))
+                .toList(),
+          ),
+          SizedBox(height: 10),
+          // City dropdown
+          TextFormField(
+            controller: cityController,
+            style: TextStyle(color: Colors.white),
+            decoration: InputDecoration(
+              hintText: 'City',
+              hintStyle: TextStyle(color: Colors.white70),
+              prefixIcon: Icon(Icons.location_city, color: Colors.white),
+              enabledBorder: OutlineInputBorder(
+                borderSide: BorderSide(color: Colors.white),
+                borderRadius: BorderRadius.circular(10),
+              ),
+              focusedBorder: OutlineInputBorder(
+                borderSide: BorderSide(color: Colors.white),
+                borderRadius: BorderRadius.circular(10),
+              ),
+            ),
+            validator: (value) =>
+            value!.isEmpty ? 'City' : null,
+          ),
+          /*DropdownButtonFormField<String>(
+            hint: Text('City', style: TextStyle(color: Colors.white70),),
+            value: selectedCity,
+            decoration: InputDecoration(
+              prefixIcon: Icon(Icons.location_city, color: Colors.white),
+              enabledBorder: OutlineInputBorder(
+                borderSide: BorderSide(color: Colors.white),
+                borderRadius: BorderRadius.circular(10),
+              ),
+              focusedBorder: OutlineInputBorder(
+                borderSide: BorderSide(color: Colors.white),
+                borderRadius: BorderRadius.circular(10),
+              ),
+            ),
+            validator: (value) => value!.isEmpty ? 'Enter City' : null,
+            onChanged: (city) {
+              setState(() {
+                selectedCity = city;
+              });
+            },
+            isExpanded: true,
+            iconEnabledColor: Colors.white,
+            items: cities
+                .map((city) =>
+                DropdownMenuItem<String>(
+                  value: city,
+                  child: Text(city),
+                ))
+                .toList(),
+          ),*/
+          SizedBox(height: 10),
+          //Zip Code
+          TextFormField(
+            controller: zipController,
+            style: TextStyle(color: Colors.white),
+            keyboardType: TextInputType.number,
+            decoration: InputDecoration(
+              hintText: 'ZIP Code',
+              hintStyle: TextStyle(color: Colors.white70),
+              prefixIcon: Icon(Icons.pin, color: Colors.white),
+              enabledBorder: OutlineInputBorder(
+                borderSide: BorderSide(color: Colors.white),
+                borderRadius: BorderRadius.circular(10),
+              ),
+              focusedBorder: OutlineInputBorder(
+                borderSide: BorderSide(color: Colors.white),
+                borderRadius: BorderRadius.circular(10),
+              ),
+            ),
+            validator: (value) => value!.isEmpty ? 'Enter ZIP code' : null,
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget buildDynamicForm() {
     return Expanded(
       child: SingleChildScrollView(
         child: Form(
-          key: _formKey,
+          //key: _formKey,
           child: Column(
-            //mainAxisAlignment: MainAxisAlignment.center,
-            //crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               SizedBox(height: 20),
               // Country dropdown
               DropdownButtonFormField<String>(
                 value: selectedCountry,
-                hint: Text('Select Country'),
+                hint: Text(
+                  'Country',
+                  style: TextStyle(color: Colors.white),
+                ),
                 decoration: InputDecoration(
                   enabledBorder: OutlineInputBorder(
-                    borderSide: BorderSide(color: Colors.black54),
+                    borderSide: BorderSide(color: Colors.white),
                     borderRadius: BorderRadius.circular(10),
                   ),
                   focusedBorder: OutlineInputBorder(
-                    borderSide: BorderSide(color: Colors.black54),
+                    borderSide: BorderSide(color: Colors.white),
                     borderRadius: BorderRadius.circular(10),
                   ),
                 ),
                 onChanged: onCountryChanged,
                 isExpanded: true,
-                  items: countries.map((country) {
-                    return DropdownMenuItem(
-                      value: country['name'],
-                      child: Row(
-                        children: [
-                          CountryFlag.fromCountryCode(
-                            country['code']!,
-                            height: 24,
-                            width: 32,
-                            shape: const RoundedRectangle(8),
-                          ),
-                          SizedBox(width: 10),
-                          Text(country['name']!),
-                        ],
-                      ),
-                    );
-                  }).toList(),
+                iconEnabledColor: Colors.white, // Set the arrow icon color here
+                items: countries.map((country) {
+                  return DropdownMenuItem(
+                    value: country['name'],
+                    child: Row(
+                      children: [
+                        CountryFlag.fromCountryCode(
+                          country['code']!,
+                          height: 24,
+                          width: 32,
+                          shape: const RoundedRectangle(8),
+                        ),
+                        SizedBox(width: 10),
+                        Text(country['name']!),
+                      ],
+                    ),
+                  );
+                }).toList(),
               ),
-
               SizedBox(height: 12),
               TextField(
                 controller: TextEditingController(text: fullName),
+                style: TextStyle(
+                  color: Colors.white,
+                ),
                 decoration: InputDecoration(
                   labelText: 'Full Name',
-                  labelStyle: TextStyle(color: Colors.black54),
-                  prefixIcon: Icon(Icons.person, color: Colors.lightBlue),
+                  labelStyle: TextStyle(color: Colors.white),
+                  prefixIcon: Icon(Icons.person, color: Colors.white),
                   enabledBorder: OutlineInputBorder(
-                    borderSide: BorderSide(color: Colors.black26),
+                    borderSide: BorderSide(color: Colors.white),
                     borderRadius: BorderRadius.circular(10),
                   ),
                   focusedBorder: OutlineInputBorder(
-                    borderSide: BorderSide(color: Colors.grey),
+                    borderSide: BorderSide(color: Colors.white),
                     borderRadius: BorderRadius.circular(8),
                   ),
                 ),
@@ -869,12 +1693,15 @@ class _LoanEligibilityScreenState extends State<LoanEligibilityScreen> {
               SizedBox(height: 12),
               TextField(
                 controller: TextEditingController(text: email),
+                style: TextStyle(
+                  color: Colors.white,
+                ),
                 decoration: InputDecoration(
                   labelText: 'Email Address',
-                  labelStyle: TextStyle(color: Colors.black54),
-                  prefixIcon: Icon(Icons.email, color: Colors.lightBlue),
+                  labelStyle: TextStyle(color: Colors.white),
+                  prefixIcon: Icon(Icons.email, color: Colors.white),
                   enabledBorder: OutlineInputBorder(
-                    borderSide: BorderSide(color: Colors.black26),
+                    borderSide: BorderSide(color: Colors.white),
                     borderRadius: BorderRadius.circular(8),
                   ),
                   focusedBorder: OutlineInputBorder(
@@ -886,71 +1713,34 @@ class _LoanEligibilityScreenState extends State<LoanEligibilityScreen> {
                 readOnly: true,
               ),
               SizedBox(height: 12),
-              /*DropdownButtonFormField<String>(
-                decoration: InputDecoration(
-                  labelText: 'Select Country',
-                ),
-                value: selectedCountry,
-                items: countries.map((country) {
-                  return DropdownMenuItem(
-                    value: country['name'],
-                    child: Row(
-                      children: [
-                        CountryFlag.fromCountryCode(
-                          country['code']!,
-                          height: 20,
-                          width: 30,
-                        ),
-                        SizedBox(width: 10),
-                        Text(country['name']!),
-                      ],
-                    ),
-                  );
-                }).toList(),
-                onChanged: (value) {
-                  setState(() {
-                    selectedCountry = value;
-                  });
-                },
-              ),*/
 
-              if (selectedCountry == 'US') _buildUSFormFields(),
-              if (selectedCountry == 'UK') _buildUKFormFields(),
-              if (selectedCountry == 'Germany') _buildGermanyFormFields(),
+              if (selectedCountry == 'US') buildUSFormFields(),
+              if (selectedCountry == 'UK') buildUKFormFields(),
+              if (selectedCountry == 'Germany') buildGermanyFormFields(),
+              if (selectedCountry == 'Poland') buildPolandFormFields(),
+              if (selectedCountry == 'Turkey') buildTurkeyFormFields(),
+
               SizedBox(height: 20),
-
-              Center(
-                child: ElevatedButton(
-                  onPressed: _showConfirmationDialog,
-                  //_submitForm,
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: Colors.teal, // Changed button color
-                    padding: EdgeInsets.symmetric(horizontal: 40, vertical: 14),
-                  ),
-                  child: Text(
-                    'Check Eligibility',
-                    style: TextStyle(fontSize: 16, color: Colors.white),
-                  ),
-                ),
-              ),
-
-              /*ElevatedButton(
-                onPressed: _showConfirmationDialog,
-                //_submitForm,
+              ElevatedButton(
+                onPressed: () => _validateForms(),
                 style: ElevatedButton.styleFrom(
-                  backgroundColor: Colors.teal, // Changed button color
-                  padding: EdgeInsets.symmetric(horizontal: 40, vertical: 14),
+                  backgroundColor: Colors.white,
+                  padding: EdgeInsets.symmetric(
+                      horizontal: 40, vertical: 14),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(10),
+                  ),
                 ),
                 child: Text(
                   'Check Eligibility',
-                  style: TextStyle(fontSize: 16, color: Colors.white),
+                  style: TextStyle(
+                    fontSize: 18,
+                    color: Colors.teal,
+                    fontWeight: FontWeight.bold,
+                  ),
                 ),
-              ),*/
-
-              /*ElevatedButton(
-                onPressed: _showConfirmationDialog,
-                child: Text('Submit'),
-              ),*/
+              ),
+              SizedBox(height: 20),
             ],
           ),
         ),
@@ -962,20 +1752,44 @@ class _LoanEligibilityScreenState extends State<LoanEligibilityScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: Text('Loan Eligibility Form'),
+      title: Text('Loan Eligibility Form'),
+        backgroundColor: Colors.white,
       ),
-      //body: _buildDynamicForm(),
-      body: Container(
-        padding: EdgeInsets.symmetric(horizontal: 20),
-        /*decoration: BoxDecoration(
-        gradient: LinearGradient(
-          colors: [Colors.blueAccent, Colors.lightGreenAccent],
-          begin: Alignment.topCenter,
-          end: Alignment.bottomCenter,
-        ),
-      ),*/
-        child: _buildDynamicForm(),
-      )
-    );
+    body: Stack(
+      children: [
+        // Background Image
+        Positioned.fill(
+
+            /*colorFilter: ColorFilter.mode(
+              Colors.black.withOpacity(0.1), // Set your desired opacity here
+              BlendMode.clear, // This blends the color to darken the image
+            ),*/
+            child: Container(
+              decoration: BoxDecoration(
+                image: DecorationImage(
+                  image: AssetImage('assets/background.png'), // Your image path here
+                  fit: BoxFit.cover, // Ensure the image covers the entire container
+                ),
+              ),
+            ),
+          ),
+
+
+        // Form content with padding and correct parent for Expanded
+        Padding(
+          padding: EdgeInsets.symmetric(horizontal: 20),
+          child: Column(
+            children: [
+                Expanded(
+                  child: buildDynamicForm(),
+                ),
+             ],
+           ),
+         ),
+       ],
+     ),
+   );
   }
 }
+
+

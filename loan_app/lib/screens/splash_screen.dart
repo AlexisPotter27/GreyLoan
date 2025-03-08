@@ -1,13 +1,11 @@
 import 'package:flutter/material.dart';
 import 'login_screen.dart';
 
-
 class SplashScreen extends StatefulWidget {
   const SplashScreen({super.key});
 
   @override
   State<SplashScreen> createState() => _SplashScreenState();
-//_SplashScreenState createState() => _SplashScreenState();
 }
 
 class _SplashScreenState extends State<SplashScreen> {
@@ -21,8 +19,8 @@ class _SplashScreenState extends State<SplashScreen> {
           context,
           MaterialPageRoute(
               builder: (context) => LoginScreen(
-                    login: null,
-                  )));
+                login: null,
+              )));
     });
   }
 
@@ -32,39 +30,40 @@ class _SplashScreenState extends State<SplashScreen> {
       body: Container(
         decoration: const BoxDecoration(
           image: DecorationImage(
-              image: AssetImage('assets/bek7.png'),
-              fit: BoxFit.cover,
+            image: AssetImage('assets/main_background.png'),
+            fit: BoxFit.cover,
           ),
         ),
         child: const Center(
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              Icon(
-                Icons.account_balance_wallet,
-                size: 100,
-                color: Colors.white,
+              // Replace Icon with Image
+              Image(
+                image: AssetImage('assets/grey_loan.png'), // Path to your logo image
+                height: 200,  // Adjust the size as necessary
+                width: 200,   // Adjust the size as necessary
               ),
-              SizedBox(height: 20),
-              Text(
+              //SizedBox(height: 10),
+             /* Text(
                 'Grey Loan',
                 style: TextStyle(
                   fontSize: 28,
                   fontWeight: FontWeight.bold,
                   color: Colors.white,
                 ),
-              ),
-              SizedBox(height: 10),
+              ),*/
+              //SizedBox(height: 10),
               Text(
                 'Your Financial Partner',
                 style: TextStyle(
-                  fontSize: 16,
-                  color: Colors.white60,
+                  fontSize: 18,
+                  color: Colors.green,
                 ),
               ),
               SizedBox(height: 50),
               CircularProgressIndicator(
-                valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                valueColor: AlwaysStoppedAnimation<Color>(Colors.green),
               ),
             ],
           ),

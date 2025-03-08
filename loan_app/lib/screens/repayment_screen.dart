@@ -1,15 +1,16 @@
 import 'package:flutter/material.dart';
+import 'package:loan_app/screens/account_screen.dart';
 import 'package:loan_app/screens/profile_screen.dart';
 import 'dashboard.dart';
 
-class SettingsScreen extends StatefulWidget {
-  const SettingsScreen({super.key});
+class RepaymentScreen extends StatefulWidget {
+  const RepaymentScreen({super.key});
 
   @override
-  State<SettingsScreen> createState() => _SettingsScreenState();
+  State<RepaymentScreen> createState() => _RepaymentScreenState();
 }
 
-class _SettingsScreenState extends State<SettingsScreen> {
+class _RepaymentScreenState extends State<RepaymentScreen> {
   final int _selectedIndex = 2; // Default to Settings tab
 
   void _onItemTapped(int index) {
@@ -23,7 +24,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
       case 1:
         Navigator.pushReplacement(
           context,
-          MaterialPageRoute(builder: (context) => const ProfileScreen()),
+          MaterialPageRoute(builder: (context) => const AccountScreen()),
         );
         break;
       case 2:
@@ -40,21 +41,21 @@ class _SettingsScreenState extends State<SettingsScreen> {
         backgroundColor: Colors.teal,
       ),
       body: const Center(
-        child: Text('Settings Screen Content'),
+        child: Text('No Record Found!'),
       ),
       bottomNavigationBar: BottomNavigationBar(
         items: const [
           BottomNavigationBarItem(
             icon: Icon(Icons.home),
-            label: 'Home',
+            label: 'Loan',
           ),
           BottomNavigationBarItem(
             icon: Icon(Icons.person),
-            label: 'Profile',
+            label: 'Account',
           ),
           BottomNavigationBarItem(
-            icon: Icon(Icons.settings),
-            label: 'Settings',
+            icon: Icon(Icons.receipt_rounded),
+            label: 'Repayment',
           ),
         ],
         currentIndex: _selectedIndex,

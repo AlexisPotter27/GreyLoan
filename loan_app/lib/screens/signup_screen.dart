@@ -15,6 +15,7 @@ class _SignUpScreenState extends State<SignUpScreen> {
   final TextEditingController nameController = TextEditingController();
   final FirebaseAuth _auth = FirebaseAuth.instance;
   bool isLoading = false;
+  bool _isPasswordVisible = false;
 
   void registerUser(BuildContext context) async {
     setState(() {
@@ -22,7 +23,8 @@ class _SignUpScreenState extends State<SignUpScreen> {
     });
 
     try {
-      UserCredential userCredential = await _auth.createUserWithEmailAndPassword(
+      UserCredential userCredential =
+          await _auth.createUserWithEmailAndPassword(
         email: emailController.text.trim(),
         password: passwordController.text.trim(),
       );
@@ -129,12 +131,28 @@ class _SignUpScreenState extends State<SignUpScreen> {
                 // Password Field
                 TextField(
                   controller: passwordController,
-                  obscureText: true,
+                  obscureText:
+                      !_isPasswordVisible, // Use the inverse of _isPasswordVisible
                   style: TextStyle(color: Colors.white),
                   decoration: InputDecoration(
                     labelText: 'Password',
                     labelStyle: TextStyle(color: Colors.white70),
                     prefixIcon: Icon(Icons.lock, color: Colors.white70),
+                    suffixIcon: IconButton(
+                      icon: Icon(
+                        _isPasswordVisible
+                            ? Icons.visibility
+                            : Icons
+                                .visibility_off, // Change the icon based on visibility state
+                        color: Colors.white70,
+                      ),
+                      onPressed: () {
+                        setState(() {
+                          _isPasswordVisible =
+                              !_isPasswordVisible; // Toggle the visibility state
+                        });
+                      },
+                    ),
                     enabledBorder: OutlineInputBorder(
                       borderSide: BorderSide(color: Colors.white70),
                       borderRadius: BorderRadius.circular(10),
@@ -148,28 +166,29 @@ class _SignUpScreenState extends State<SignUpScreen> {
                 SizedBox(height: 20),
                 // Sign-Up Button
                 isLoading
-                    ? Center(child: CircularProgressIndicator(color: Colors.white))
+                    ? Center(
+                        child: CircularProgressIndicator(color: Colors.white))
                     : SizedBox(
-                  width: double.infinity,
-                  height: 50,
-                  child: ElevatedButton(
-                    onPressed: () => registerUser(context),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: Colors.white,
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(10),
+                        width: double.infinity,
+                        height: 50,
+                        child: ElevatedButton(
+                          onPressed: () => registerUser(context),
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: Colors.white,
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(10),
+                            ),
+                          ),
+                          child: Text(
+                            'Sign Up',
+                            style: TextStyle(
+                              fontSize: 18,
+                              color: Colors.blueAccent,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                        ),
                       ),
-                    ),
-                    child: Text(
-                      'Sign Up',
-                      style: TextStyle(
-                        fontSize: 18,
-                        color: Colors.blueAccent,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                  ),
-                ),
                 SizedBox(height: 20),
                 // Login Prompt
                 Center(

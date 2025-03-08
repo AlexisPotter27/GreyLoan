@@ -1546,3 +1546,193 @@ class DashboardScreen extends StatelessWidget {
     );
   }
 }
+====================================================================================================
+import 'package:flutter/material.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+
+class LoanHistoryScreen extends StatelessWidget {
+  const LoanHistoryScreen({Key? key}) : super(key: key);
+
+  String? _requestedAmount;
+  String? _loanStatus;
+  String? _loanTenureMonths;
+  String? _selectedLoanType;
+
+  Future<void> _fetchLoanHistory() async {
+    User? user = FirebaseAuth.instance.currentUser;
+    if (user != null) {
+      DocumentSnapshot userData = await FirebaseFirestore.instance
+          .collection('loanApplications')
+          .doc(user.uid)
+          .get();
+      if (mounted) {
+        setState(() {
+          _loanStatus = userData['loanStatus'];
+          _requestedAmount = userData['requestedAmount'];
+          _loanTenureMonths = userData['loanTenureMonths'];
+          _selectedLoanType = userData['selectedLoanType'];
+        });
+      }
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(
+        title: const Text("Loan History"),
+        backgroundColor: Colors.teal,
+      ),
+      body: Padding(
+        padding: const EdgeInsets.all(16.0),
+        child: FutureBuilder<List<Map<String, dynamic>>>(
+          future: _fetchLoanHistory(),
+          builder: (context, snapshot) {
+            if (snapshot.connectionState == ConnectionState.waiting) {
+              return const Center(child: CircularProgressIndicator(color: Colors.teal));
+            }
+
+            if (!snapshot.hasData || snapshot.data!.isEmpty) {
+              return const Center(
+                child: Text(
+                  "No loan applications found.",
+                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                ),
+              );
+            }
+
+            final loanApplications = snapshot.data!;
+
+            return ListView.builder(
+              itemCount: loanApplications.length,
+              itemBuilder: (context, index) {
+                final loan = loanApplications[index];
+                final status = loan['loanStatus'] ?? 'Pending';
+                final amount = loan['requestedAmount'] ?? 'N/A';
+                final tenure = loan['loanTenureMonths'] ?? 'N/A';
+                final loanType = loan['selectedLoanType'] ?? 'Unknown';
+
+                return Card(
+                  elevation: 4,
+                  margin: const EdgeInsets.symmetric(vertical: 8, horizontal: 4),
+                  child: ListTile(
+                    title: Text(
+                      "Loan Type: $loanType",
+                      style: const TextStyle(fontWeight: FontWeight.bold),
+                    ),
+                    subtitle: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text("Amount: \$${amount.toString()}"),
+                        Text("Tenure: $tenure months"),
+                      ],
+                    ),
+                    trailing: Chip(
+                      label: Text(
+                        status,
+                        style: TextStyle(
+                          color: status == 'Approved'
+                              ? Colors.green
+                              : status == 'Rejected'
+                              ? Colors.red
+                              : Colors.orange,
+                        ),
+                      ),
+                      backgroundColor: status == 'Approved'
+                          ? Colors.green[100]
+                          : status == 'Rejected'
+                          ? Colors.red[100]
+                          : Colors.orange[100],
+                    ),
+                  ),
+                );
+              },
+            );
+          },
+        ),
+      ),
+    );
+  }
+}
+
+
+===============================================================================
+/*
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:flutter/material.dart';
+import '../models/loan.dart';
+
+class LoanHistoryScreen extends StatefulWidget {
+  final String userId;  // Assuming you have a userId to fetch loans for a specific user.
+
+  const LoanHistoryScreen({super.key, required this.userId});
+
+  @override
+  _LoanHistoryScreenState createState() => _LoanHistoryScreenState();
+}
+
+class _LoanHistoryScreenState extends State<LoanHistoryScreen> {
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(
+        title: Text('Loan History'),
+      ),
+      body: StreamBuilder<QuerySnapshot>(
+        stream: FirebaseFirestore.instance
+            .collection('loanApplications') // Collection name
+            .where('userId', isEqualTo: widget.userId) // Query for the specific user
+            .snapshots(),
+        builder: (context, snapshot) {
+          if (snapshot.connectionState == ConnectionState.waiting) {
+            return Center(child: CircularProgressIndicator());
+          }
+
+          if (snapshot.hasError) {
+            return Center(child: Text('Something went wrong.'));
+          }
+
+          if (snapshot.data == null || snapshot.data!.docs.isEmpty) {
+            return Center(child: Text('No loan history found.'));
+          }
+
+          final loans = snapshot.data!.docs.map((doc) {
+            return Loan.fromFirestore(doc.data() as Map<String, dynamic>);
+          }).toList();
+
+          return ListView.builder(
+            itemCount: loans.length,
+            itemBuilder: (context, index) {
+              final loan = loans[index];
+
+              return Card(
+                margin: EdgeInsets.symmetric(vertical: 10, horizontal: 15),
+                elevation: 5,
+                child: ListTile(
+                  title: Text('Loan Status: ${loan.loanStatus}'),
+                  subtitle: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text('Requested Amount: \$${loan.requestedAmount.toStringAsFixed(2)}'),
+                      Text('Tenure: ${loan.loanTenureMonths} months'),
+                      Text('Loan Type: ${loan.selectedLoanType}'),
+                    ],
+                  ),
+                ),
+              );
+            },
+          );
+        },
+      ),
+    );
+  }
+}
+====================================================================================================
+
+
+
+
+
+
+

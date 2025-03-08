@@ -1,18 +1,24 @@
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
+import 'package:loan_app/screens/loanProcessing_screen.dart';
 
 class LoanTypeAmountScreen extends StatefulWidget {
   const LoanTypeAmountScreen({super.key});
 
   @override
-  _LoanTypeAmountScreenState createState() => _LoanTypeAmountScreenState();
+  State<LoanTypeAmountScreen> createState() => _LoanTypeAmountScreenState();
 }
 
 class _LoanTypeAmountScreenState extends State<LoanTypeAmountScreen> {
   final _formKey = GlobalKey<FormState>();
+  String? _loanStatus;
   String? _selectedLoanType;
   String? _selectedPurpose;
-  double _requestedAmount = 5000; // Default loan amount
-  int _loanTenureMonths = 12; // Default loan tenure in months
+  double _requestedAmount = 1000; // Default loan amount
+  int _loanTenureMonths = 6; // Default loan tenure in months
+
+  String? country;
 
   final List<String> _loanTypes = [
     "Personal",
@@ -32,6 +38,63 @@ class _LoanTypeAmountScreenState extends State<LoanTypeAmountScreen> {
     "Vacation",
     "Other",
   ];
+
+  Future<void> _fetchUserDetails() async {
+    User? user = FirebaseAuth.instance.currentUser;
+    if (user != null) {
+      DocumentSnapshot userData = await FirebaseFirestore.instance
+          .collection('loanApplications')
+          .doc(user.uid)
+          .get();
+      if (mounted) {
+        setState(() {
+          country = userData['country'];
+        });
+      }
+    }
+  }
+
+  String getCountryIcon(String? country) {
+    _fetchUserDetails();
+    if (country == 'US') {
+      return '\$'; // Dollar sign for US
+    } else if (country == 'UK') {
+      return '£'; // Pound sign for UK
+    } else if (country == 'Germany') {
+      return '€'; // Euro sign for Germany
+    } else if (country == 'Poland') {
+      return 'zł';
+    } else if (country == 'Turkey') {
+      return '₺';
+    }
+    return '\$';
+  }
+
+  void _submitForm() async {
+    if (_formKey.currentState!.validate()) {
+      _formKey.currentState!.save();
+      _loanStatus = 'Pending';
+      //int creditScore = _generateCreditScore();
+      User? user = FirebaseAuth.instance.currentUser;
+
+      await FirebaseFirestore.instance
+          .collection('loanApplications')
+          .doc(user!.uid)
+          .set({
+        'userId': user.uid,
+        'loanStatus': _loanStatus,
+        'selectedLoanType': _selectedLoanType,
+        'selectedPurpose': _selectedPurpose.toString(),
+        'requestedAmount': double.parse(_requestedAmount.toString()),
+        'loanTenureMonths': double.parse(_loanTenureMonths.toString()),
+      }, SetOptions(merge: true));
+
+      Navigator.push(
+        context,
+        MaterialPageRoute(builder: (context) => LoanProcessingScreen()),
+      );
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -78,8 +141,8 @@ class _LoanTypeAmountScreenState extends State<LoanTypeAmountScreen> {
                 ),
                 Slider(
                   value: _requestedAmount,
-                  min: 1000,
-                  max: 100000,
+                  min: 200,
+                  max: 10000,
                   divisions: 100,
                   label: _requestedAmount.toStringAsFixed(0),
                   onChanged: (value) {
@@ -89,7 +152,7 @@ class _LoanTypeAmountScreenState extends State<LoanTypeAmountScreen> {
                   },
                 ),
                 Text(
-                  " Amount: ${_requestedAmount.toStringAsFixed(0)}",
+                  " Amount:${getCountryIcon(country)}${_requestedAmount.toStringAsFixed(0)}",
                   style: TextStyle(fontSize: 16),
                 ),
                 SizedBox(height: 16),
@@ -99,10 +162,10 @@ class _LoanTypeAmountScreenState extends State<LoanTypeAmountScreen> {
                 ),
                 Slider(
                   value: _loanTenureMonths.toDouble(),
-                  min: 6,
-                  max: 120,
+                  min: 2,
+                  max: 24,
                   divisions: 114,
-                  label: "${_loanTenureMonths} Months",
+                  label: "$_loanTenureMonths Months",
                   onChanged: (value) {
                     setState(() {
                       _loanTenureMonths = value.toInt();
@@ -110,7 +173,7 @@ class _LoanTypeAmountScreenState extends State<LoanTypeAmountScreen> {
                   },
                 ),
                 Text(
-                  "Tenure: ${_loanTenureMonths} Months",
+                  "Tenure: $_loanTenureMonths Months",
                   style: TextStyle(fontSize: 16),
                 ),
                 SizedBox(height: 16),
@@ -143,14 +206,33 @@ class _LoanTypeAmountScreenState extends State<LoanTypeAmountScreen> {
                     onPressed: () {
                       if (_formKey.currentState!.validate()) {
                         // Handle form submission
+                        _submitForm();
                         ScaffoldMessenger.of(context).showSnackBar(
                           SnackBar(
                             content: Text("Details submitted successfully!"),
                           ),
                         );
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(builder: (context) => LoanProcessingScreen()),
+                        );
                       }
                     },
-                    child: Text("Submit"),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Colors.teal,
+                      padding: EdgeInsets.symmetric(
+                          horizontal: 40, vertical: 14),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                    ),
+                    child: Text("Submit",
+                      style: TextStyle(
+                          fontSize: 18,
+                          fontWeight: FontWeight.bold,
+                          color: Colors.white
+                      ),
+                    ),
                   ),
                 ),
               ],
@@ -161,3 +243,4 @@ class _LoanTypeAmountScreenState extends State<LoanTypeAmountScreen> {
     );
   }
 }
+

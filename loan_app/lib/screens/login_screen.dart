@@ -20,6 +20,7 @@ class _LoginScreenState extends State<LoginScreen> {
   final TextEditingController passwordController = TextEditingController();
   final FirebaseAuth _auth = FirebaseAuth.instance;
   bool isLoading = false;
+  bool _isPasswordVisible = false;
 
   void loginUser(BuildContext context) async {
     setState(() {
@@ -86,7 +87,7 @@ class _LoginScreenState extends State<LoginScreen> {
         padding: EdgeInsets.symmetric(horizontal: 20),
         decoration: BoxDecoration(
           image: DecorationImage(
-            image: AssetImage('assets/background.png'),
+            image: AssetImage('assets/main_background.png'),
             fit: BoxFit.cover,
           ),
         ),
@@ -101,7 +102,7 @@ class _LoginScreenState extends State<LoginScreen> {
                   style: TextStyle(
                     fontSize: 32,
                     fontWeight: FontWeight.bold,
-                    color: Colors.white,
+                    color: Colors.green,
                   ),
                 ),
                 SizedBox(height: 10),
@@ -109,7 +110,7 @@ class _LoginScreenState extends State<LoginScreen> {
                   'Login to your account',
                   style: TextStyle(
                     fontSize: 18,
-                    color: Colors.white70,
+                    color: Colors.green,
                   ),
                 ),
                 SizedBox(height: 40),
@@ -117,17 +118,17 @@ class _LoginScreenState extends State<LoginScreen> {
                 TextField(
                   controller: emailController,
                   keyboardType: TextInputType.emailAddress,
-                  style: TextStyle(color: Colors.white),
+                  style: TextStyle(color: Colors.green),
                   decoration: InputDecoration(
                     labelText: 'Email',
-                    labelStyle: TextStyle(color: Colors.white70),
-                    prefixIcon: Icon(Icons.email, color: Colors.white70),
+                    labelStyle: TextStyle(color: Colors.teal),
+                    prefixIcon: Icon(Icons.email, color: Colors.green),
                     enabledBorder: OutlineInputBorder(
-                      borderSide: BorderSide(color: Colors.white70),
+                      borderSide: BorderSide(color: Colors.black87),
                       borderRadius: BorderRadius.circular(10),
                     ),
                     focusedBorder: OutlineInputBorder(
-                      borderSide: BorderSide(color: Colors.white),
+                      borderSide: BorderSide(color: Colors.black87),
                       borderRadius: BorderRadius.circular(10),
                     ),
                   ),
@@ -136,18 +137,34 @@ class _LoginScreenState extends State<LoginScreen> {
                 // Password Field
                 TextField(
                   controller: passwordController,
-                  obscureText: true,
-                  style: TextStyle(color: Colors.white),
+                  obscureText:
+                  !_isPasswordVisible, // Use the inverse of _isPasswordVisible
+                  style: TextStyle(color: Colors.green),
                   decoration: InputDecoration(
                     labelText: 'Password',
-                    labelStyle: TextStyle(color: Colors.white70),
-                    prefixIcon: Icon(Icons.lock, color: Colors.white70),
+                    labelStyle: TextStyle(color: Colors.green),
+                    prefixIcon: Icon(Icons.lock, color: Colors.green),
+                    suffixIcon: IconButton(
+                      icon: Icon(
+                        _isPasswordVisible
+                            ? Icons.visibility
+                            : Icons
+                            .visibility_off, // Change the icon based on visibility state
+                        color: Colors.teal,
+                      ),
+                      onPressed: () {
+                        setState(() {
+                          _isPasswordVisible =
+                          !_isPasswordVisible; // Toggle the visibility state
+                        });
+                      },
+                    ),
                     enabledBorder: OutlineInputBorder(
-                      borderSide: BorderSide(color: Colors.white70),
+                      borderSide: BorderSide(color: Colors.black87),
                       borderRadius: BorderRadius.circular(10),
                     ),
                     focusedBorder: OutlineInputBorder(
-                      borderSide: BorderSide(color: Colors.white),
+                      borderSide: BorderSide(color: Colors.black87),
                       borderRadius: BorderRadius.circular(10),
                     ),
                   ),
@@ -165,7 +182,7 @@ class _LoginScreenState extends State<LoginScreen> {
                     },
                     child: Text(
                       'Forgot Password?',
-                      style: TextStyle(color: Colors.white60),
+                      style: TextStyle(color: Colors.green),
                     ),
                   ),
                 ),
@@ -173,14 +190,14 @@ class _LoginScreenState extends State<LoginScreen> {
                 // Login Button
                 isLoading
                     ? Center(
-                        child: CircularProgressIndicator(color: Colors.white))
+                        child: CircularProgressIndicator(color: Colors.green))
                     : SizedBox(
                         width: double.infinity,
                         height: 50,
                         child: ElevatedButton(
                           onPressed: () => loginUser(context),
                           style: ElevatedButton.styleFrom(
-                            backgroundColor: Colors.white,
+                            backgroundColor: Colors.green,
                             shape: RoundedRectangleBorder(
                               borderRadius: BorderRadius.circular(10),
                             ),
@@ -189,7 +206,7 @@ class _LoginScreenState extends State<LoginScreen> {
                             'Login',
                             style: TextStyle(
                               fontSize: 18,
-                              color: Colors.blueAccent,
+                              color: Colors.white,
                               fontWeight: FontWeight.bold,
                             ),
                           ),
@@ -208,12 +225,12 @@ class _LoginScreenState extends State<LoginScreen> {
                     child: RichText(
                       text: TextSpan(
                         text: "Don't have an account? ",
-                        style: TextStyle(color: Colors.white70, fontSize: 16),
+                        style: TextStyle(color: Colors.teal, fontSize: 16),
                         children: [
                           TextSpan(
                             text: 'Sign Up',
                             style: TextStyle(
-                              color: Colors.white,
+                              color: Colors.green,
                               fontWeight: FontWeight.bold,
                             ),
                           ),

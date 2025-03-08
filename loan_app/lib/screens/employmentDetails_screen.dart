@@ -1,15 +1,17 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:font_awesome_flutter/font_awesome_flutter.dart';
+import 'package:intl/intl.dart';
 import 'package:loan_app/screens/loanTypeAmount_screen.dart';
-
 import '../widgets/showSnackbak.dart';
 
 class EmploymentDetailsScreen extends StatefulWidget {
   const EmploymentDetailsScreen({super.key});
 
   @override
-  _EmploymentDetailsScreenState createState() => _EmploymentDetailsScreenState();
+  State<EmploymentDetailsScreen> createState() => _EmploymentDetailsScreenState();
 }
 
 class _EmploymentDetailsScreenState extends State<EmploymentDetailsScreen> {
@@ -21,6 +23,8 @@ class _EmploymentDetailsScreenState extends State<EmploymentDetailsScreen> {
 
   String? _employmentType;
   String? _selectedIndustry;
+  String? country;
+
 
   final List<String> _employmentTypes = ["Salaried", "Self-Employed", "Freelancer"];
   final List<String> _industries = [
@@ -43,22 +47,81 @@ class _EmploymentDetailsScreenState extends State<EmploymentDetailsScreen> {
       User? user = FirebaseAuth.instance.currentUser;
 
       await FirebaseFirestore.instance
-          .collection('loanApplicationsEmployment')
+          .collection('loanApplications')
           .doc(user!.uid)
-          .set({
+          .set({ 
         'employmentType': _employmentType,
         'company_businessName': _companyNameController.text,
         'jobTitle_designation': _jobTitleController.text,
         'monthlyIncome': double.parse(_monthlyIncomeController.text),
         'employmentDuration': int.parse(_employmentDurationController.text),
         'industry_sector': _selectedIndustry,
-      });
+      }, SetOptions(merge: true));
 
       Navigator.push(
         context,
         MaterialPageRoute(builder: (context) => LoanTypeAmountScreen()),
       );
     }
+  }
+
+  Future<void> _fetchUserDetails() async {
+    User? user = FirebaseAuth.instance.currentUser;
+    if (user != null) {
+      DocumentSnapshot userData = await FirebaseFirestore.instance
+          .collection('loanApplications')
+          .doc(user.uid)
+          .get();
+      if (mounted) {
+        setState(() {
+          country = userData['country'];
+        });
+      }
+    }
+  }
+
+ /* String currency() {
+    Locale locale = Localizations.localeOf(context);
+    var format = NumberFormat.simpleCurrency(locale: locale.toString());
+    //print("CURRENCY SYMBOL ${format.currencySymbol}"); // $
+    //print("CURRENCY NAME ${format.currencyName}"); // USD
+    return format.currencySymbol;
+
+  }*/
+
+  /*Icon? getCountryIcon(String? country) {
+    if (country == 'US') {
+      return Icon(Icons.attach_money); // Dollar sign for US
+    } else if (country == 'UK') {
+      return Icon(Icons.currency_pound); // Pound sign for UK
+    } else if (country == 'Germany') {
+      return Icon(Icons.euro); // Euro sign for Germany
+    } else if (country == 'Poland'){
+      return Icon(FontAwesomeIcons.moneyBill1Wave);
+    }
+    return null;
+  }*/
+
+  String getCountryIcon(String? country) {
+    _fetchUserDetails();
+    if (country == 'US') {
+      return '\$ '; // Dollar sign for US
+    } else if (country == 'UK') {
+      return '£ '; // Pound sign for UK
+    } else if (country == 'Germany') {
+      return '€ '; // Euro sign for Germany
+    } else if (country == 'Poland') {
+      return 'zł ';
+    } else if (country == 'Turkey') {
+      return '₺ ';
+    }
+    return '\$ ';
+  }
+
+  @override
+  void initState() {
+    super.initState();
+    _fetchUserDetails(); // Fetch user details when the widget is initialized
   }
 
   @override
@@ -133,6 +196,7 @@ class _EmploymentDetailsScreenState extends State<EmploymentDetailsScreen> {
                   decoration: InputDecoration(
                     labelText: "Monthly Income",
                     border: OutlineInputBorder(),
+                    prefixText: getCountryIcon(country), // Call the method to get the icon dynamically
                   ),
                   keyboardType: TextInputType.number,
                   validator: (value) {
@@ -199,7 +263,22 @@ class _EmploymentDetailsScreenState extends State<EmploymentDetailsScreen> {
                         );
                       }
                     },
-                    child: Text("Submit"),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Colors.teal,
+                      padding: EdgeInsets.symmetric(
+                          horizontal: 40, vertical: 14),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                    ),
+                    child: Text(
+                      'Submit',
+                      style: TextStyle(
+                        fontSize: 18,
+                        color: Colors.white,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
                   ),
                 ),
               ],
